@@ -28,17 +28,11 @@ on:
         required: true
         type: string
         default: "6c13a0695a1115e1000c998872b66f4ff5b2f11e"
-      sukisu_version_mode:
-        description: "SukiSU driver version mode. auto = derive KSU_VERSION from the selected SukiSU ref itself; manual = use sukisu_driver_version below. auto avoids the upstream Makefile using the current main-branch commit count for an older pinned ref."
-        required: true
-        type: choice
-        options: [auto, manual]
-        default: auto
       sukisu_driver_version:
-        description: "Manual SukiSU/KernelSU driver version, e.g. 40796. Used only when sukisu_version_mode=manual. Leave empty in auto mode."
-        required: false
+        description: "SukiSU/KernelSU driver version. Use 'auto' (recommended) to derive KSU_VERSION from the selected SukiSU ref itself, or enter a numeric version such as 40796 to force it manually."
+        required: true
         type: string
-        default: ""
+        default: "auto"
       kpm_enable:
         description: "Enable SukiSU KPM support. Kernel support only; no random KPM modules bundled."
         required: true
@@ -446,9 +440,22 @@ jobs:
           cd kernel_workspace
           mkdir -p "$GITHUB_WORKSPACE/_ox_debug"
 
-          mode="${{ inputs.sukisu_version_mode }}"
-          manual_version="${{ inputs.sukisu_driver_version }}"
+          version_input="${{ inputs.sukisu_driver_version }}"
           selected_ref="${SUKISU_SELECTED_REF:-${{ inputs.sukisu_ref }}}"
+
+          # Keep workflow_dispatch at GitHub's 25-input limit by using one field:
+          #   auto / blank -> derive the version from the selected SukiSU ref
+          #   numeric value -> force that driver version manually
+          case "${version_input,,}" in
+            ""|auto)
+              mode="auto"
+              manual_version=""
+              ;;
+            *)
+              mode="manual"
+              manual_version="$version_input"
+              ;;
+          esac
 
           # Prefer the Makefile actually compiled through common/drivers/kernelsu.
           KSU_MK=""
@@ -514,7 +521,7 @@ jobs:
                 if ! [[ "$version_base" =~ ^[0-9]+$ && "$version_offset" =~ ^[0-9]+$ && "$commit_count" =~ ^[0-9]+$ ]]; then
                   echo "::error::Could not derive SukiSU KSU_VERSION automatically from the selected ref."
                   echo "VERSION_BASE=$version_base VERSION_OFFSET=$version_offset commit_count=$commit_count"
-                  echo "Switch sukisu_version_mode to manual and enter the expected driver version."
+                  echo "Set sukisu_driver_version to the expected numeric driver version, e.g. 40796."
                   exit 1
                 fi
 
@@ -523,10 +530,6 @@ jobs:
               fi
               ;;
 
-            *)
-              echo "::error::Unknown sukisu_version_mode: $mode"
-              exit 1
-              ;;
           esac
 
           if ! [[ "$driver_version" =~ ^[0-9]+$ ]] || [ "$driver_version" -le 0 ]; then
@@ -1349,7 +1352,8 @@ jobs:
           Kernel source: cctv18/android_kernel_common_oneplus_sm8750 @ ${{ env.CCTV18_KERNEL_REF }}
           Build assets: cctv18/oppo_oplus_realme_sm8750
           Root: SukiSU Ultra via official setup.sh, requested=${{ inputs.sukisu_ref }}, selected=${SUKISU_SELECTED_REF:-unknown}
-          SukiSU driver version mode: ${{ inputs.sukisu_version_mode }}
+          SukiSU driver version input: ${{ inputs.sukisu_driver_version }}
+          SukiSU driver version mode: ${{ steps.sukisu_version.outputs.mode }}
           SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}
           SUSFS: cctv18/susfs4oki only, ref=${{ inputs.susfs_ref }}
           SUSFS patch policy: ${{ inputs.susfs_patch_policy }}
@@ -1398,7 +1402,8 @@ jobs:
             echo "Profile: ${{ inputs.profile }}"
             echo "SukiSU Ultra requested ref: ${{ inputs.sukisu_ref }}"
             echo "SukiSU Ultra selected ref: ${SUKISU_SELECTED_REF:-unknown}"
-            echo "SukiSU version mode: ${{ inputs.sukisu_version_mode }}"
+            echo "SukiSU driver version input: ${{ inputs.sukisu_driver_version }}"
+            echo "SukiSU version mode: ${{ steps.sukisu_version.outputs.mode }}"
             echo "SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}"
             echo "SUSFS enabled: ${{ inputs.SUSFS }}"
             echo "SUSFS ref: ${{ inputs.susfs_ref }}"
