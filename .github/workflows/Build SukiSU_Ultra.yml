@@ -29,7 +29,7 @@ on:
         type: string
         default: "6c13a0695a1115e1000c998872b66f4ff5b2f11e"
       sukisu_driver_version:
-        description: "SukiSU/KernelSU driver version. Use 'auto' (recommended) to derive KSU_VERSION from the selected SukiSU ref itself, or enter a numeric version such as 40796 to force it manually."
+        description: "SukiSU/KernelSU driver version. Use 'auto' (recommended) to read the versionCode from the latest official SukiSU Ultra Manager release asset; or enter a numeric version such as 40796 to force it manually. This avoids unreliable git commit-count calculations on the builtin branch."
         required: true
         type: string
         default: "auto"
@@ -432,9 +432,11 @@ jobs:
               cat "$GITHUB_WORKSPACE/_ox_debug/sukisu-apk-sign-dryrun.log" || true
             fi
           fi
-      - name: "Resolve SukiSU driver version (auto/manual)"
+      - name: "Resolve SukiSU driver version (release auto/manual)"
         id: sukisu_version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cd kernel_workspace
@@ -443,17 +445,15 @@ jobs:
           version_input="${{ inputs.sukisu_driver_version }}"
           selected_ref="${SUKISU_SELECTED_REF:-${{ inputs.sukisu_ref }}}"
 
-          # Keep workflow_dispatch at GitHub's 25-input limit by using one field:
-          #   auto / blank -> derive the version from the selected SukiSU ref
-          #   numeric value -> force that driver version manually
+          # One workflow input handles both modes (keeps workflow_dispatch <= 25 inputs):
+          #   auto / blank -> use the versionCode of the latest OFFICIAL released Manager
+          #   numeric      -> force that driver version manually
           case "${version_input,,}" in
             ""|auto)
-              mode="auto"
-              manual_version=""
+              mode="auto_release"
               ;;
             *)
               mode="manual"
-              manual_version="$version_input"
               ;;
           esac
 
@@ -470,76 +470,103 @@ jobs:
             exit 1
           fi
 
-          KSU_REPO=""
-          if [ -d KernelSU/.git ]; then
-            KSU_REPO="KernelSU"
-          fi
-
-          echo "Version mode : $mode"
-          echo "Selected ref : $selected_ref"
+          echo "Version mode   : $mode"
+          echo "Selected ref   : $selected_ref"
           echo "SukiSU Makefile: $KSU_MK"
 
           driver_version=""
+          release_tag=""
+          release_asset=""
           version_source=""
 
-          case "$mode" in
-            manual)
-              if ! [[ "$manual_version" =~ ^[0-9]+$ ]]; then
-                echo "::error::Manual mode requires a numeric sukisu_driver_version, e.g. 40796."
-                exit 1
-              fi
-              driver_version="$manual_version"
-              version_source="manual input"
-              ;;
+          if [ "$mode" = "manual" ]; then
+            if ! [[ "$version_input" =~ ^[0-9]+$ ]]; then
+              echo "::error::sukisu_driver_version must be 'auto' or a numeric version such as 40796."
+              exit 1
+            fi
+            driver_version="$version_input"
+            version_source="manual input"
+          else
+            echo "==> Querying latest official SukiSU Ultra release"
+            api_url="https://api.github.com/repos/SukiSU-Ultra/SukiSU-Ultra/releases/latest"
+            release_json="$GITHUB_WORKSPACE/_ox_debug/sukisu-latest-release.json"
 
-            auto)
-              # First support a future SukiSU tree that exposes a literal numeric KSU_VERSION.
-              literal_version="$(sed -nE 's/^[[:space:]]*KSU_VERSION[[:space:]]*:?=[[:space:]]*([0-9]+)[[:space:]]*$/\1/p' "$KSU_MK" | tail -n1 || true)"
-              if [[ "$literal_version" =~ ^[0-9]+$ ]]; then
-                driver_version="$literal_version"
-                version_source="literal KSU_VERSION in selected ref"
-              else
-                # Current SukiSU calculates: VERSION_BASE + commit_count - VERSION_OFFSET.
-                # Use the selected ref's OWN full history count, never the current main branch count.
-                if [ -z "$KSU_REPO" ]; then
-                  echo "::error::Auto mode needs the SukiSU git repository to calculate the selected-ref commit count."
-                  echo "::error::Use manual mode if upstream setup stops retaining KernelSU/.git."
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$api_url" -o "$release_json"
+
+            release_tag="$(jq -r '.tag_name // empty' "$release_json")"
+            if [ -z "$release_tag" ] || [ "$release_tag" = "null" ]; then
+              echo "::error::Latest SukiSU release did not provide tag_name."
+              exit 1
+            fi
+
+            # Official Manager release assets are named like:
+            #   SukiSU_v4.1.3_40796-release.apk
+            # Prefer a release APK and extract the long numeric versionCode immediately
+            # before '-release.apk'. Fall back to the last 5+ digit number in an APK name.
+            mapfile -t apk_assets < <(jq -r '.assets[]?.name // empty' "$release_json" | grep -Ei '^SukiSU_.*[.]apk$' || true)
+            if [ "${#apk_assets[@]}" -eq 0 ]; then
+              mapfile -t apk_assets < <(jq -r '.assets[]?.name // empty' "$release_json" | grep -Ei '[.]apk$' || true)
+            fi
+
+            for asset in "${apk_assets[@]}"; do
+              v="$(printf '%s\n' "$asset" | sed -nE 's/.*[_-]([0-9]{5,})-release[.]apk$/\1/p')"
+              if [[ "$v" =~ ^[0-9]+$ ]]; then
+                driver_version="$v"
+                release_asset="$asset"
+                break
+              fi
+            done
+
+            if [ -z "$driver_version" ]; then
+              for asset in "${apk_assets[@]}"; do
+                v="$(printf '%s\n' "$asset" | grep -oE '[0-9]{5,}' | tail -n1 || true)"
+                if [[ "$v" =~ ^[0-9]+$ ]]; then
+                  driver_version="$v"
+                  release_asset="$asset"
+                  break
+                fi
+              done
+            fi
+
+            if ! [[ "$driver_version" =~ ^[0-9]+$ ]]; then
+              echo "::error::Could not extract SukiSU Manager versionCode from latest release assets."
+              echo "Release tag: $release_tag"
+              echo "APK assets:"
+              printf '  %s\n' "${apk_assets[@]:-<none>}"
+              echo "::error::Set sukisu_driver_version manually (for example 40796) and rerun."
+              exit 1
+            fi
+
+            version_source="official latest release $release_tag asset $release_asset"
+
+            # Safety guard for the currently pinned pre-UAPI builtin commit.
+            # It is intentionally paired with v4.1.3/40796. If upstream publishes a
+            # newer Manager, do NOT merely stamp the new number onto this old kernel
+            # interface: choose a new compatible SukiSU ref, or manually keep 40796.
+            case "$selected_ref" in
+              6c13a0695a1115e1000c998872b66f4ff5b2f11e|6c13a06*)
+                if [ "$release_tag" != "v4.1.3" ] || [ "$driver_version" != "40796" ]; then
+                  echo "::error::The pinned 6c13a06 pre-UAPI ref is the v4.1.3/40796 compatibility lane."
+                  echo "::error::Latest official Manager is $release_tag/$driver_version."
+                  echo "::error::Either set sukisu_driver_version=40796 to keep 6c13a06, or change sukisu_ref to a ref compatible with the new Manager and keep auto."
                   exit 1
                 fi
-
-                if [ "$(git -C "$KSU_REPO" rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
-                  echo "==> Expanding shallow SukiSU history for deterministic version calculation"
-                  git -C "$KSU_REPO" fetch --unshallow --tags origin
-                else
-                  git -C "$KSU_REPO" fetch --tags origin >/dev/null 2>&1 || true
-                fi
-
-                version_base="$(sed -nE 's/^[[:space:]]*VERSION_BASE[[:space:]]*:?=[[:space:]]*([0-9]+).*/\1/p' "$KSU_MK" | head -n1 || true)"
-                version_offset="$(sed -nE 's/^[[:space:]]*VERSION_OFFSET[[:space:]]*:?=[[:space:]]*([0-9]+).*/\1/p' "$KSU_MK" | head -n1 || true)"
-                commit_count="$(git -C "$KSU_REPO" rev-list --count HEAD 2>/dev/null || true)"
-
-                if ! [[ "$version_base" =~ ^[0-9]+$ && "$version_offset" =~ ^[0-9]+$ && "$commit_count" =~ ^[0-9]+$ ]]; then
-                  echo "::error::Could not derive SukiSU KSU_VERSION automatically from the selected ref."
-                  echo "VERSION_BASE=$version_base VERSION_OFFSET=$version_offset commit_count=$commit_count"
-                  echo "Set sukisu_driver_version to the expected numeric driver version, e.g. 40796."
-                  exit 1
-                fi
-
-                driver_version=$((version_base + commit_count - version_offset))
-                version_source="selected-ref formula: ${version_base}+${commit_count}-${version_offset}"
-              fi
-              ;;
-
-          esac
+                ;;
+            esac
+          fi
 
           if ! [[ "$driver_version" =~ ^[0-9]+$ ]] || [ "$driver_version" -le 0 ]; then
             echo "::error::Resolved invalid SukiSU driver version: $driver_version"
             exit 1
           fi
 
-          # Insert a local override immediately before KSU_VERSION_FULL is calculated.
-          # This keeps upstream code intact while preventing GITHUB_COMMITS(main) from changing
-          # the driver version when an older ref (such as 6c13a06) is intentionally pinned.
+          # Override only KSU_VERSION immediately before KSU_VERSION_FULL is evaluated.
+          # Do not alter the selected source ref or its UAPI; this only fixes the numeric
+          # driver version exposed to the Manager.
           export KSU_MK driver_version
           python3 - <<'PY'
           from pathlib import Path
@@ -573,16 +600,22 @@ jobs:
             echo "mode=$mode"
             echo "selected_ref=$selected_ref"
             echo "driver_version=$driver_version"
+            echo "release_tag=$release_tag"
+            echo "release_asset=$release_asset"
             echo "source=$version_source"
             echo "makefile=$KSU_MK"
           } | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-driver-version.txt"
 
-          grep -nE 'VERSION_BASE|VERSION_OFFSET|OX_SUKISU_VERSION_OVERRIDE|override KSU_VERSION|KSU_VERSION_FULL' "$KSU_MK" \
+          grep -nE 'VERSION_BASE|VERSION_OFFSET|GITHUB_COMMITS|LOCAL_COUNT|KSU_VERSION[[:space:]]*:?=|OX_SUKISU_VERSION_OVERRIDE|override KSU_VERSION|KSU_VERSION_FULL' "$KSU_MK" \
             | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-makefile-scan.txt" || true
 
           echo "SUKISU_DRIVER_VERSION=$driver_version" >> "$GITHUB_ENV"
+          echo "SUKISU_RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+          echo "SUKISU_RELEASE_ASSET=$release_asset" >> "$GITHUB_ENV"
           echo "driver_version=$driver_version" >> "$GITHUB_OUTPUT"
           echo "version_source=$version_source" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "release_asset=$release_asset" >> "$GITHUB_OUTPUT"
           echo "==> Resolved SukiSU driver version: $driver_version ($version_source)"
 
       - name: "SukiSU Ultra compile compatibility repairs"
