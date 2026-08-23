@@ -28,6 +28,17 @@ on:
         required: true
         type: string
         default: "6c13a0695a1115e1000c998872b66f4ff5b2f11e"
+      sukisu_version_mode:
+        description: "SukiSU driver version mode. auto = derive KSU_VERSION from the selected SukiSU ref itself; manual = use sukisu_driver_version below. auto avoids the upstream Makefile using the current main-branch commit count for an older pinned ref."
+        required: true
+        type: choice
+        options: [auto, manual]
+        default: auto
+      sukisu_driver_version:
+        description: "Manual SukiSU/KernelSU driver version, e.g. 40796. Used only when sukisu_version_mode=manual. Leave empty in auto mode."
+        required: false
+        type: string
+        default: ""
       kpm_enable:
         description: "Enable SukiSU KPM support. Kernel support only; no random KPM modules bundled."
         required: true
@@ -410,12 +421,10 @@ jobs:
             exit 1
           fi
 
-          # Version information is best-effort only. Do not break clean builds if upstream changes Kbuild variables.
+          # Source audit only. The real driver version is resolved in the next step.
           if [ -d KernelSU/.git ]; then
             cnt="$(git -C KernelSU rev-list --count HEAD 2>/dev/null || true)"
             tag="$(git -C KernelSU describe --tags --abbrev=0 2>/dev/null || true)"
-            [ -n "$cnt" ] && echo "KSUVER=$((cnt + 30000))" >> "$GITHUB_ENV" || true
-            [ -n "$tag" ] && echo "KSUTAG=$tag" >> "$GITHUB_ENV" || true
             echo "sukisu_version_count=$cnt" >> "$GITHUB_OUTPUT"
             echo "sukisu_tag=$tag" >> "$GITHUB_OUTPUT"
           fi
@@ -429,6 +438,150 @@ jobs:
               cat "$GITHUB_WORKSPACE/_ox_debug/sukisu-apk-sign-dryrun.log" || true
             fi
           fi
+      - name: "Resolve SukiSU driver version (auto/manual)"
+        id: sukisu_version
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel_workspace
+          mkdir -p "$GITHUB_WORKSPACE/_ox_debug"
+
+          mode="${{ inputs.sukisu_version_mode }}"
+          manual_version="${{ inputs.sukisu_driver_version }}"
+          selected_ref="${SUKISU_SELECTED_REF:-${{ inputs.sukisu_ref }}}"
+
+          # Prefer the Makefile actually compiled through common/drivers/kernelsu.
+          KSU_MK=""
+          for cand in common/drivers/kernelsu/Makefile KernelSU/kernel/Makefile; do
+            if [ -f "$cand" ]; then
+              KSU_MK="$cand"
+              break
+            fi
+          done
+          if [ -z "$KSU_MK" ]; then
+            echo "::error::Could not locate the SukiSU kernel Makefile."
+            exit 1
+          fi
+
+          KSU_REPO=""
+          if [ -d KernelSU/.git ]; then
+            KSU_REPO="KernelSU"
+          fi
+
+          echo "Version mode : $mode"
+          echo "Selected ref : $selected_ref"
+          echo "SukiSU Makefile: $KSU_MK"
+
+          driver_version=""
+          version_source=""
+
+          case "$mode" in
+            manual)
+              if ! [[ "$manual_version" =~ ^[0-9]+$ ]]; then
+                echo "::error::Manual mode requires a numeric sukisu_driver_version, e.g. 40796."
+                exit 1
+              fi
+              driver_version="$manual_version"
+              version_source="manual input"
+              ;;
+
+            auto)
+              # First support a future SukiSU tree that exposes a literal numeric KSU_VERSION.
+              literal_version="$(sed -nE 's/^[[:space:]]*KSU_VERSION[[:space:]]*:?=[[:space:]]*([0-9]+)[[:space:]]*$/\1/p' "$KSU_MK" | tail -n1 || true)"
+              if [[ "$literal_version" =~ ^[0-9]+$ ]]; then
+                driver_version="$literal_version"
+                version_source="literal KSU_VERSION in selected ref"
+              else
+                # Current SukiSU calculates: VERSION_BASE + commit_count - VERSION_OFFSET.
+                # Use the selected ref's OWN full history count, never the current main branch count.
+                if [ -z "$KSU_REPO" ]; then
+                  echo "::error::Auto mode needs the SukiSU git repository to calculate the selected-ref commit count."
+                  echo "::error::Use manual mode if upstream setup stops retaining KernelSU/.git."
+                  exit 1
+                fi
+
+                if [ "$(git -C "$KSU_REPO" rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+                  echo "==> Expanding shallow SukiSU history for deterministic version calculation"
+                  git -C "$KSU_REPO" fetch --unshallow --tags origin
+                else
+                  git -C "$KSU_REPO" fetch --tags origin >/dev/null 2>&1 || true
+                fi
+
+                version_base="$(sed -nE 's/^[[:space:]]*VERSION_BASE[[:space:]]*:?=[[:space:]]*([0-9]+).*/\1/p' "$KSU_MK" | head -n1 || true)"
+                version_offset="$(sed -nE 's/^[[:space:]]*VERSION_OFFSET[[:space:]]*:?=[[:space:]]*([0-9]+).*/\1/p' "$KSU_MK" | head -n1 || true)"
+                commit_count="$(git -C "$KSU_REPO" rev-list --count HEAD 2>/dev/null || true)"
+
+                if ! [[ "$version_base" =~ ^[0-9]+$ && "$version_offset" =~ ^[0-9]+$ && "$commit_count" =~ ^[0-9]+$ ]]; then
+                  echo "::error::Could not derive SukiSU KSU_VERSION automatically from the selected ref."
+                  echo "VERSION_BASE=$version_base VERSION_OFFSET=$version_offset commit_count=$commit_count"
+                  echo "Switch sukisu_version_mode to manual and enter the expected driver version."
+                  exit 1
+                fi
+
+                driver_version=$((version_base + commit_count - version_offset))
+                version_source="selected-ref formula: ${version_base}+${commit_count}-${version_offset}"
+              fi
+              ;;
+
+            *)
+              echo "::error::Unknown sukisu_version_mode: $mode"
+              exit 1
+              ;;
+          esac
+
+          if ! [[ "$driver_version" =~ ^[0-9]+$ ]] || [ "$driver_version" -le 0 ]; then
+            echo "::error::Resolved invalid SukiSU driver version: $driver_version"
+            exit 1
+          fi
+
+          # Insert a local override immediately before KSU_VERSION_FULL is calculated.
+          # This keeps upstream code intact while preventing GITHUB_COMMITS(main) from changing
+          # the driver version when an older ref (such as 6c13a06) is intentionally pinned.
+          export KSU_MK driver_version
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+
+          path = Path(os.environ['KSU_MK'])
+          version = os.environ['driver_version']
+          src = path.read_text(encoding='utf-8', errors='strict')
+
+          begin = '# OX_SUKISU_VERSION_OVERRIDE_BEGIN'
+          end = '# OX_SUKISU_VERSION_OVERRIDE_END'
+          src = re.sub(
+              r'\n?# OX_SUKISU_VERSION_OVERRIDE_BEGIN\n.*?# OX_SUKISU_VERSION_OVERRIDE_END\n?',
+              '\n', src, flags=re.S
+          )
+
+          match = re.search(r'(?m)^[ \t]*KSU_VERSION_FULL[ \t]*:?=', src)
+          if not match:
+              raise SystemExit('KSU_VERSION_FULL anchor not found in SukiSU Makefile')
+
+          block = (
+              f'{begin}\n'
+              f'override KSU_VERSION := {version}\n'
+              f'{end}\n'
+          )
+          src = src[:match.start()] + block + src[match.start():]
+          path.write_text(src, encoding='utf-8')
+          PY
+
+          {
+            echo "mode=$mode"
+            echo "selected_ref=$selected_ref"
+            echo "driver_version=$driver_version"
+            echo "source=$version_source"
+            echo "makefile=$KSU_MK"
+          } | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-driver-version.txt"
+
+          grep -nE 'VERSION_BASE|VERSION_OFFSET|OX_SUKISU_VERSION_OVERRIDE|override KSU_VERSION|KSU_VERSION_FULL' "$KSU_MK" \
+            | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-makefile-scan.txt" || true
+
+          echo "SUKISU_DRIVER_VERSION=$driver_version" >> "$GITHUB_ENV"
+          echo "driver_version=$driver_version" >> "$GITHUB_OUTPUT"
+          echo "version_source=$version_source" >> "$GITHUB_OUTPUT"
+          echo "==> Resolved SukiSU driver version: $driver_version ($version_source)"
+
       - name: "SukiSU Ultra compile compatibility repairs"
         shell: bash
         run: |
@@ -683,54 +836,6 @@ jobs:
             find . -name '*.rej' -print | tee "$GITHUB_WORKSPACE/_ox_debug/rejects-after-optional-stage.txt"
             exit 1
           fi
-
-      - name: "Pin SukiSU v4.1.3 driver version (40796)"
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd kernel_workspace
-          mkdir -p "$GITHUB_WORKSPACE/_ox_debug"
-
-          # 6c13a06 still calculates KSU_VERSION from the CURRENT upstream
-          # main-branch commit count. Pin the driver integer and display tag so
-          # the released v4.1.3 manager (40796) sees the intended old-UAPI pair.
-          KSU_MK=""
-          for candidate in \
-            common/drivers/kernelsu/Makefile \
-            KernelSU/kernel/Makefile; do
-            if [ -f "$candidate" ]; then
-              KSU_MK="$candidate"
-              break
-            fi
-          done
-
-          if [ -z "$KSU_MK" ]; then
-            echo "::error::Could not find the SukiSU kernel Makefile to pin KSU_VERSION."
-            exit 1
-          fi
-
-          echo "==> Pinning SukiSU driver version in: $KSU_MK"
-          cp -f "$KSU_MK" "$GITHUB_WORKSPACE/_ox_debug/sukisu-Makefile.before-version-pin"
-
-          sed -i -E \
-            's/^[[:space:]]*KSU_VERSION[[:space:]]*:=[[:space:]].*/KSU_VERSION     := 40796/' \
-            "$KSU_MK"
-          sed -i -E \
-            's/^[[:space:]]*VERSION_TAG[[:space:]]*:=[[:space:]].*/VERSION_TAG     := 4.1.3/' \
-            "$KSU_MK"
-
-          if ! grep -Eq '^[[:space:]]*KSU_VERSION[[:space:]]*:=[[:space:]]*40796([[:space:]]|$)' "$KSU_MK"; then
-            echo "::error::Failed to pin KSU_VERSION=40796."
-            exit 1
-          fi
-          if ! grep -Eq '^[[:space:]]*VERSION_TAG[[:space:]]*:=[[:space:]]*4[.]1[.]3([[:space:]]|$)' "$KSU_MK"; then
-            echo "::error::Failed to pin VERSION_TAG=4.1.3."
-            exit 1
-          fi
-
-          echo "==> SukiSU version pin applied"
-          grep -nE '^[[:space:]]*(KSU_VERSION|VERSION_TAG)[[:space:]]*:=' "$KSU_MK" \
-            | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-pin.txt"
 
       - name: "Enable features via defconfig"
         shell: bash
@@ -1004,13 +1109,6 @@ jobs:
           echo "==> Building Image"
           make -j"$(nproc --all)" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$GITHUB_WORKSPACE/_ox_debug/build.log"
 
-          echo "==> Verifying SukiSU driver version"
-          if ! grep -Fq -- '-- SukiSU-Ultra version: 40796 [' "$GITHUB_WORKSPACE/_ox_debug/build.log"; then
-            echo "::error::Built SukiSU driver is not version 40796. Refusing to package a manager-mismatched kernel."
-            grep -F -- '-- SukiSU-Ultra version:' "$GITHUB_WORKSPACE/_ox_debug/build.log" || true
-            exit 1
-          fi
-
           image="out/arch/arm64/boot/Image"
           if [ ! -s "$image" ]; then
             echo "::error::Kernel Image was not produced."
@@ -1029,6 +1127,37 @@ jobs:
           echo "UTS_RELEASE=$uts" | tee "$GITHUB_WORKSPACE/_ox_debug/uts.txt"
           echo "uts=$uts" >> "$GITHUB_OUTPUT"
           ccache -s | tee "$GITHUB_WORKSPACE/_ox_debug/ccache-final.txt" || true
+
+      - name: "Verify compiled SukiSU driver version"
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${SUKISU_DRIVER_VERSION:-}"
+          log="$GITHUB_WORKSPACE/_ox_debug/build.log"
+
+          if ! [[ "$expected" =~ ^[0-9]+$ ]]; then
+            echo "::error::SUKISU_DRIVER_VERSION is missing or invalid: '$expected'"
+            exit 1
+          fi
+          if [ ! -s "$log" ]; then
+            echo "::error::Build log is missing: $log"
+            exit 1
+          fi
+
+          line="$(grep -m1 -E -- '-- SukiSU-Ultra version: [0-9]+' "$log" || true)"
+          actual="$(printf '%s\n' "$line" | sed -nE 's/.*SukiSU-Ultra version: ([0-9]+).*/\1/p')"
+
+          echo "Expected SukiSU driver version: $expected"
+          echo "Compiled SukiSU driver version: ${actual:-not-found}"
+          echo "Compiler line: ${line:-not-found}"
+
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::SukiSU driver version mismatch: expected $expected, compiled ${actual:-unknown}. Refusing to package the kernel."
+            exit 1
+          fi
+
+          printf '%s\n' "$line" > "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-verified.txt"
+          echo "==> SukiSU driver version verification passed."
 
       - name: "Package AnyKernel3 (single zip, banner, no breakage)"
         shell: bash
@@ -1220,6 +1349,8 @@ jobs:
           Kernel source: cctv18/android_kernel_common_oneplus_sm8750 @ ${{ env.CCTV18_KERNEL_REF }}
           Build assets: cctv18/oppo_oplus_realme_sm8750
           Root: SukiSU Ultra via official setup.sh, requested=${{ inputs.sukisu_ref }}, selected=${SUKISU_SELECTED_REF:-unknown}
+          SukiSU driver version mode: ${{ inputs.sukisu_version_mode }}
+          SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}
           SUSFS: cctv18/susfs4oki only, ref=${{ inputs.susfs_ref }}
           SUSFS patch policy: ${{ inputs.susfs_patch_policy }}
           WildKernels SUSFS patch tree: NOT USED
@@ -1267,6 +1398,8 @@ jobs:
             echo "Profile: ${{ inputs.profile }}"
             echo "SukiSU Ultra requested ref: ${{ inputs.sukisu_ref }}"
             echo "SukiSU Ultra selected ref: ${SUKISU_SELECTED_REF:-unknown}"
+            echo "SukiSU version mode: ${{ inputs.sukisu_version_mode }}"
+            echo "SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}"
             echo "SUSFS enabled: ${{ inputs.SUSFS }}"
             echo "SUSFS ref: ${{ inputs.susfs_ref }}"
             echo "SUSFS patch policy: ${{ inputs.susfs_patch_policy }}"
