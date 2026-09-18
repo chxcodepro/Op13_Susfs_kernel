@@ -16,6 +16,8 @@ env:
   CCTV18_ASSETS_REF: "21db9e7d547ca625bd5aa734fb5dfc8b94ea48ef"
   CCTV18_KERNEL_COMMIT: "2a4726b11594dd57d0779d2685fad5c81e5ed553"
   SUKISU_SETUP_REF: "f2201c472b607557ed8563e2d1b729af25f3111b"
+  SUKISU_KPM_PATCH_REF: "547ae94bcaec53d030398f857950c64662043a5d"
+  SUKISU_KPM_PATCH_SHA256: "1bd00563e9d8fbbd11a16c0c1c59c5add406e6c5c92557def50f93d6f0aebe2d"
   AK3_REF: "020dfeccf9d7e962a48400fc94d3e451df92eead"
   CCACHE_MAXSIZE: 8G
 
@@ -29,17 +31,21 @@ on:
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       sukisu_ref:
-        description: "SukiSU Ultra ref. MUST BE PAIRED WITH susfs_ref AND with the manager APK. DEFAULT f2201c4 = builtin branch, no_su generation, and the newest builtin commit that actually compiles (HEAD e2912817 does not: kernel/feature/kernel_umount.c references kernel_umount_feature_set without defining it). Pair with susfs_ref 40e6c19 and INSTALL THE v4.2.0 MANAGER APK (SukiSU_v4.2.0_40900_releases.apk, version code 40900). v111 makes the driver REPORT 40900 to match it (GITHUB_COMMITS=3715); without that the driver reports a live API-derived number and the manager shows a permanent version mismatch, which rejects App Profile writes and breaks root. Its ksud also carries the susfs CLI needed to hide mounts. To stay on v4.1.3, use the OLD pair instead: sukisu 6c13a0695a1115e1000c998872b66f4ff5b2f11e + susfs 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a."
+        description: "SukiSU Ultra source ref. MUST BE PAIRED WITH susfs_ref. DEFAULT f2201c4 is the compile-tested builtin/no_su generation and pairs with susfs 40e6c19; newer builtin HEAD e2912817 does not compile because kernel_umount_feature_set is undefined. Select the Manager/driver version separately with sukisu_driver_version: auto reads the latest official Manager release at run time, while 40900 keeps the tested v4.2.0 pairing. To stay on v4.1.3/40796, use the OLD pair instead: sukisu 6c13a0695a1115e1000c998872b66f4ff5b2f11e + susfs 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a."
         required: true
         type: string
         default: "f2201c472b607557ed8563e2d1b729af25f3111b"
       sukisu_driver_version:
-        description: "SukiSU/KernelSU driver version. Use 'auto' (recommended) to read the versionCode from the latest official SukiSU Ultra Manager release asset; or enter a numeric version such as 40796 to force it manually. This avoids unreliable git commit-count calculations on the builtin branch."
+        description: "Choose auto (recommended) to read the versionCode from the latest official SukiSU Ultra Manager release, or select a known compatibility version."
         required: true
-        type: string
+        type: choice
+        options:
+          - auto
+          - "40900"
+          - "40796"
         default: "auto"
       kpm_enable:
-        description: "Enable SukiSU KPM support. Kernel support only; no random KPM modules bundled."
+        description: "Enable real SukiSU KPM support: compile CONFIG_KPM and patch the final Image with the pinned official KernelPatch tool. No KPM modules are bundled."
         required: true
         type: boolean
         default: true
@@ -634,6 +640,7 @@ jobs:
           echo "SUKISU_RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
           echo "SUKISU_RELEASE_ASSET=$release_asset" >> "$GITHUB_ENV"
           echo "driver_version=$driver_version" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "version_source=$version_source" >> "$GITHUB_OUTPUT"
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "release_asset=$release_asset" >> "$GITHUB_OUTPUT"
@@ -1055,6 +1062,8 @@ jobs:
             set_y CONFIG_KPM
             set_y CONFIG_KALLSYMS
             set_y CONFIG_KALLSYMS_ALL
+          else
+            set_n CONFIG_KPM
           fi
 
           if [ "${{ inputs.multi_manager_support }}" = "true" ]; then
@@ -1377,34 +1386,10 @@ jobs:
 
           MAKE_ARGS=(O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang")
           echo "==> Building Image"
-          # ---- v111: report a driver version that matches the manager APK ----
-          # SukiSU's kernel/Kbuild computes the driver version from a LIVE
-          # api.github.com commit count on `main`:
-          #     KSU_VERSION := VERSION_BASE(40000) + LOCAL_COUNT - VERSION_OFFSET(2815)
-          # When that curl is used, the number climbs on every upstream push,
-          # regardless of which commit we actually build -- so the manager shows a
-          # PERMANENT "driver version mismatch", App Profile writes are rejected, and
-          # root effectively stops working. That is the failure this pins out.
-          #
-          # The number is set purely by the commit count passed as GITHUB_COMMITS on
-          # the make line; it is INDEPENDENT of the source commit we compile. So we
-          # can keep the compile-safe, SUSFS-2.2.0-paired driver (f2201c4) AND report
-          # the exact version the current manager APK expects.
-          #
-          # Current release: SukiSU_v4.2.0_40900_releases.apk -> version code 40900.
-          #     40900 = 40000 + LOCAL_COUNT - 2815  ->  LOCAL_COUNT = 3715
-          # So GITHUB_COMMITS=3715 makes the driver report 40900 == v4.2.0 manager.
-          # Verified ABI-compatible with f2201c4: KERNEL_SU_OPTION is still 0xDEADBEEF
-          # and the app_profile struct is byte-identical between f2201c4 and the
-          # v4.2.0 tag, so only the version number needed fixing.
-          #
-          # If you install a DIFFERENT manager APK, set SUKISU_VERSION_COMMITS so that
-          # 40000 + N - 2815 equals that APK's version code (shown in its filename),
-          # e.g. v4.1.3 (40796) -> N=3611.
-          SUKISU_VERSION_COMMITS="${SUKISU_VERSION_COMMITS:-3715}"
-          REPORTED_VER="$((40000 + SUKISU_VERSION_COMMITS - 2815))"
-          echo "==> Pinning SukiSU driver version to $REPORTED_VER (install the matching manager APK; 40900 = v4.2.0)."
-          MAKE_ARGS+=("GITHUB_COMMITS=$SUKISU_VERSION_COMMITS")
+          # The previous step inserts an explicit KSU_VERSION override from the
+          # selected Manager release. Do not also derive a second version from a live
+          # commit count here: the compiled value is verified before KPM patching.
+          echo "==> Building SukiSU driver version ${SUKISU_DRIVER_VERSION:-unknown}."
 
           make -j"$(nproc --all)" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$GITHUB_WORKSPACE/_ox_debug/build.log"
 
@@ -1414,9 +1399,6 @@ jobs:
             find out -maxdepth 6 -type f -name 'Image*' -printf '%p %s bytes\n' | tee "$GITHUB_WORKSPACE/_ox_debug/image-search.txt" || true
             exit 1
           fi
-
-          cp -f "$image" "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111"
-          sha256sum "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111" | tee "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111.sha256"
 
           uts="unknown"
           if [ -f out/include/generated/utsrelease.h ]; then
@@ -1457,6 +1439,92 @@ jobs:
 
           printf '%s\n' "$line" > "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-verified.txt"
           echo "==> SukiSU driver version verification passed."
+
+      - name: "Patch final Image with SukiSU KernelPatch/KPM"
+        id: kpm_patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$GITHUB_WORKSPACE/kernel_workspace/common/out/arch/arm64/boot/Image"
+          config="$GITHUB_WORKSPACE/kernel_workspace/common/out/.config"
+          log="$GITHUB_WORKSPACE/_ox_debug/kpm-patch.log"
+
+          if [ ! -s "$image" ]; then
+            echo "::error::Cannot patch KPM: built Image is missing."
+            exit 1
+          fi
+          if [ ! -s "$config" ]; then
+            echo "::error::Cannot patch KPM: final kernel config is missing."
+            exit 1
+          fi
+
+          if grep -q '^CONFIG_KPM=y' "$config"; then
+            echo "==> CONFIG_KPM=y found; applying the pinned official SukiSU KernelPatch payload."
+            tool_dir="$GITHUB_WORKSPACE/kpm_tools"
+            patcher="$tool_dir/patch_linux"
+            mkdir -p "$tool_dir"
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 \
+              "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/${SUKISU_KPM_PATCH_REF}/kpm/patch_linux" \
+              -o "$patcher"
+
+            printf '%s  %s\n' "$SUKISU_KPM_PATCH_SHA256" "$patcher" | sha256sum -c -
+            sha256sum "$patcher" | tee "$GITHUB_WORKSPACE/_ox_debug/kpm-patch-tool.sha256"
+            chmod 0755 "$patcher"
+
+            image_dir="$(dirname "$image")"
+            raw_sha="$(sha256sum "$image" | awk '{print $1}')"
+            raw_size="$(stat -c '%s' "$image")"
+            rm -f "$image_dir/oImage"
+            ( cd "$image_dir" && "$patcher" ) 2>&1 | tee "$log"
+
+            patched="$image_dir/oImage"
+            if [ ! -s "$patched" ]; then
+              echo "::error::KernelPatch did not produce oImage; refusing to package a stub-only KPM kernel."
+              exit 1
+            fi
+            patched_sha="$(sha256sum "$patched" | awk '{print $1}')"
+            patched_size="$(stat -c '%s' "$patched")"
+            if [ "$raw_sha" = "$patched_sha" ]; then
+              echo "::error::KernelPatch output is byte-identical to the raw Image; refusing to package it."
+              exit 1
+            fi
+
+            mv -f "$patched" "$image"
+            {
+              echo "status=patched"
+              echo "patch_ref=$SUKISU_KPM_PATCH_REF"
+              echo "patch_tool_sha256=$SUKISU_KPM_PATCH_SHA256"
+              echo "raw_image_sha256=$raw_sha"
+              echo "raw_image_size=$raw_size"
+              echo "patched_image_sha256=$patched_sha"
+              echo "patched_image_size=$patched_size"
+            } | tee "$GITHUB_WORKSPACE/_ox_debug/kpm-patch-status.txt"
+            echo "KPM_PATCH_STATUS=patched" >> "$GITHUB_ENV"
+            echo "status=patched" >> "$GITHUB_OUTPUT"
+          else
+            if [ "${{ inputs.kpm_enable }}" = "true" ] && [ "${{ inputs.profile }}" != "minimal_safe" ]; then
+              echo "::error::KPM was requested but CONFIG_KPM=y is absent; refusing to publish a falsely-labelled KPM build."
+              exit 1
+            fi
+            echo "status=disabled" | tee "$GITHUB_WORKSPACE/_ox_debug/kpm-patch-status.txt"
+            echo "KPM_PATCH_STATUS=disabled" >> "$GITHUB_ENV"
+            echo "status=disabled" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Finalize Image artifact and SHA256"
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="kernel_workspace/common/out/arch/arm64/boot/Image"
+          image_name="Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111"
+          if [ ! -s "$src" ]; then
+            echo "::error::Final Image is missing after the KPM stage."
+            exit 1
+          fi
+          cp -f "$src" "artifacts/$image_name"
+          ( cd artifacts && sha256sum "$image_name" > "$image_name.sha256" )
+          ( cd artifacts && sha256sum -c "$image_name.sha256" )
+          cat "artifacts/$image_name.sha256"
 
       - name: "Package AnyKernel3 (single zip, banner, no breakage)"
         shell: bash
@@ -1654,6 +1722,8 @@ jobs:
           SukiSU driver version input: ${{ inputs.sukisu_driver_version }}
           SukiSU driver version mode: ${{ steps.sukisu_version.outputs.mode }}
           SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}
+          KPM final Image status: ${KPM_PATCH_STATUS:-unknown}
+          KPM patch source: SukiSU-Ultra/SukiSU_patch @ ${SUKISU_KPM_PATCH_REF}
           SUSFS: cctv18/susfs4oki only, ref=${{ inputs.susfs_ref }}
           SUSFS patch policy: ${{ inputs.susfs_patch_policy }}
           WildKernels SUSFS patch tree: NOT USED
@@ -1670,7 +1740,17 @@ jobs:
 
           zip_name="AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111_${{ github.run_number }}_FLASH_THIS.zip"
           ( cd ak3_work && zip -r9 "../artifacts/$zip_name" . >/dev/null )
-          sha256sum "artifacts/$zip_name" | tee "artifacts/$zip_name.sha256"
+          ( cd artifacts && sha256sum "$zip_name" > "$zip_name.sha256" )
+
+          image_name="Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111"
+          expected_image_sha="$(awk '{print $1}' "artifacts/$image_name.sha256")"
+          packaged_image_sha="$(unzip -p "artifacts/$zip_name" Image | sha256sum | awk '{print $1}')"
+          printf '%s  %s\n' "$packaged_image_sha" "Image" | tee _ox_debug/packaged-image.sha256
+          if [ "$packaged_image_sha" != "$expected_image_sha" ]; then
+            echo "::error::AnyKernel3 contains an Image whose SHA256 differs from the published Image artifact."
+            exit 1
+          fi
+          ( cd artifacts && sha256sum -c "$zip_name.sha256" )
 
           echo "==> AnyKernel3 package scan"
           unzip -p "artifacts/$zip_name" anykernel.sh | sed -n '1,130p' | tee _ox_debug/packaged-anykernel.sh.txt
@@ -1709,6 +1789,8 @@ jobs:
             echo "SUSFS patch policy: ${{ inputs.susfs_patch_policy }}"
             echo "Hook mode: ${{ inputs.hook_mode }}"
             echo "KPM enabled: ${{ inputs.kpm_enable }}"
+            echo "KPM final Image status: ${KPM_PATCH_STATUS:-unknown}"
+            echo "KPM patch ref: ${SUKISU_KPM_PATCH_REF}"
             echo "Multi-manager support: ${{ inputs.multi_manager_support }}"
             echo "Manager spoof patch: true (fixed default)"
             echo "LZ4/ZSTD patch group: ${{ inputs.lz4_zram_patch == 'On' }}"
@@ -1742,6 +1824,8 @@ jobs:
               echo ""
               echo "## Verdict"
               echo "- Main flashable zip uses fixed AnyKernel3 OP13 boot detection."
+              echo "- KPM final Image status: ${KPM_PATCH_STATUS:-unknown}."
+              echo "- Image and AnyKernel3 SHA256 files are generated after KPM patching and verified against the packaged Image."
               echo "- SUSFS source: CCTV18 only."
               echo "- ZRAM/LZ4 config enabled: ${{ inputs.zram_module == 'On' }} / ${{ inputs.zram_comp }}."
               echo "- ZRAM runtime tuning: use the X1 Kernel Manager module (separate tuner zip removed)."
@@ -1772,10 +1856,22 @@ jobs:
             echo "::error::Build failed before producing Image. Download OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v111 debug artifact."
             exit 1
           fi
+          ( cd artifacts && sha256sum -c Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111.sha256 )
           if [ "true" = "true" ] && ! ls artifacts/AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111_*_FLASH_THIS.zip >/dev/null 2>&1; then
             echo "::error::Image built but AnyKernel3 flashable ZIP was not produced."
             exit 1
           fi
+          zip_sha_file="$(find artifacts -maxdepth 1 -type f -name 'AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111_*_FLASH_THIS.zip.sha256' -print -quit)"
+          if [ -z "$zip_sha_file" ]; then
+            echo "::error::AnyKernel3 SHA256 file was not produced."
+            exit 1
+          fi
+          ( cd artifacts && sha256sum -c "$(basename "$zip_sha_file")" )
+          if [ "${{ inputs.kpm_enable }}" = "true" ] && [ "${{ inputs.profile }}" != "minimal_safe" ] && [ "${KPM_PATCH_STATUS:-}" != "patched" ]; then
+            echo "::error::KPM was requested but the final Image was not KernelPatch-patched."
+            exit 1
+          fi
           echo "✅ OP13 SukiSU Ultra + CCTV18-only SUSFS inline stock-like daily-driver build completed."
+          echo "✅ KPM final Image status: ${KPM_PATCH_STATUS:-unknown}."
           echo "✅ Fixed AnyKernel3 boot partition detection: BLOCK=boot, IS_SLOT_DEVICE=auto, SLOT_SELECT=active."
           echo "✅ No WildKernels/TheWildJames SUSFS patch tree was used."
