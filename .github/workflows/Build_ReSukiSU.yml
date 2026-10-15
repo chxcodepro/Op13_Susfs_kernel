@@ -1,4 +1,4 @@
-name: OP13 ReSukiSU
+name: OP13 BakaSU (ReSukiSU)
 
 env:
   TZ: Asia/Shanghai
@@ -12,10 +12,15 @@ env:
   CCTV18_KERNEL_REF: oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118
   CCTV18_TOOLCHAIN_RELEASE: LLVM-Clang18-r510928
   CCACHE_DIR: ${{ github.workspace }}/.ccache_op13_resukisu_cctv18
-  # v108 pins (reproducible build). Change deliberately, in pairs where noted.
+  # v109 pins (reproducible build). Change deliberately, in pairs where noted.
   CCTV18_ASSETS_REF: "21db9e7d547ca625bd5aa734fb5dfc8b94ea48ef"
   CCTV18_KERNEL_COMMIT: "2a4726b11594dd57d0779d2685fad5c81e5ed553"
-  RESUKISU_SETUP_REF: "23a40c0f1dc047ee73a1dfd70a3f14df70021cac"
+  # v109: who implements SELinux hiding. bakasu (default) = BakaSU's own
+  # selinux_hide with the KernelSU #3877 timing side-channel fix; SUSFS's
+  # SELinux-hide sections are not applied. susfs = apply them and let BakaSU
+  # use SUSFS's hooks (no #3877 fix -- this is why BakaSU blocks SUSFS builds).
+  OX_BAKASU_SELINUX_HIDE_OWNER: bakasu
+  RESUKISU_SETUP_REF: "d7260ca1e5c128061122924d0d48754e361e135c"
   AK3_REF: "020dfeccf9d7e962a48400fc94d3e451df92eead"
   CCACHE_MAXSIZE: 8G
 
@@ -29,10 +34,10 @@ on:
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       resukisu_ref:
-        description: "ReSukiSU ref. MUST BE PAIRED WITH susfs_ref. ReSukiSU 03b60f2 ('kernel: sync with latest susfs') switched to the susfs_*_no_su helpers, and CCTV18 SUSFS 525c450 renamed the guard TIF_PROC_UMOUNTED -> TIF_PROC_NO_SU. Mixing an OLD ReSukiSU with a NEW SUSFS makes the new guard read the old umounted mark as 'no su', so the kernel skips the su redirect for every app and shell and `su` fails in Termux/adb. Keep both new (main + a susfs_ref at/after 525c450), which is the pairing of the known-good build."
+        description: "BakaSU ref (Baka-SU/BakaSU; ReSukiSU was renamed BakaSU, same manager package com.resukisu.resukisu and signing key). MUST BE PAIRED WITH susfs_ref (no_su generation: driver susfs_set_current_proc_no_su + SUSFS at/after 525c450). v109 DEFAULT d7260ca = BakaSU main 2026-10-14. BakaSU main deliberately stops SUSFS builds (kernel/tools/susfs_compat.mk, commit 48fa4bb) because SUSFS SELinux-hide hooks lack KernelSU #3877 (timing side-channel fix). v109 handles that in Apply SUSFS: SUSFS's SELinux-hide sections are not applied, so BakaSU's own up-to-date selinux_hide is used, and only then is the gate lifted. Verified: SUSFS-touched objects + full driver compile, all cross-symbols resolve. Previous known-good: 23a40c0 + susfs 383616f (v108)."
         required: true
         type: string
-        default: "23a40c0f1dc047ee73a1dfd70a3f14df70021cac"
+        default: "d7260ca1e5c128061122924d0d48754e361e135c"
       kpm_enable:
         description: "Enable KPM (KernelPatch Module) support. DEFAULT OFF for ReSukiSU: this root has NO kernel-side KPM implementation (KPM exists only as a deprecated manager/uapi enum, verified at the pinned commit), so enabling it cannot produce CONFIG_KPM=y and only emits a harmless 'KPM requested but not present' warning. KPM is a SukiSU-Ultra feature; leave this Off on ReSukiSU."
         required: true
@@ -50,10 +55,10 @@ on:
         options: ["On", "Off"]
         default: "On"
       susfs_ref:
-        description: "CCTV18 susfs4oki ref. v108 DEFAULT 383616f = SUSFS v2.3.0 (2026-09-08). SAFE ON ReSukiSU: ReSukiSU main defines ksu_install_su_fd() and gates on it via kernel/tools/susfs_compat.mk, and v2.3.0 fs/exec.c calls ksu_install_su_fd() directly, so the pair links cleanly (verified: applies to 6.6.118 with only the expected task_mmu.c reject). It still contains fix 525c450 (no_su guard) so su works from shells. DO NOT reuse on the SukiSU lane -- SukiSU f2201c4 lacks ksu_install_su_fd() and would fail to link against v2.3.0; that lane stays on v2.2.0 (40e6c19)."
+        description: "CCTV18 susfs4oki ref (oki-android15-6.6). v109 DEFAULT 3f6aae5 = SUSFS v2.3.0, latest CCTV18 (2026-10-15, synced to KernelSU 0a1f3ff). All SUSFS features are kept (sus_path, sus_mount, sus_kstat, sus_map, uname/cmdline spoof, open_redirect, kallsyms hiding, AVC log spoof); only its SELinux-hide sections (security/selinux/hooks.c, selinuxfs.c, ss/services.c) are left to BakaSU, see OX_BAKASU_SELINUX_HIDE_OWNER. Contains 525c450 (no_su guard). Previous pin 383616f (v108, with resukisu 23a40c0). MUST MATCH the driver generation; a mismatch makes the kernel skip the su redirect for every app and shell."
         required: true
         type: string
-        default: "383616fb42bb11c53a77384fa3ed2dc4df6d603b"
+        default: "3f6aae536724af0df3dfa15f932034d14a5dbc5c"
       susfs_patch_policy:
         description: "strict = fail on reject; audited_cctv18 = allow known task_mmu reject only; native_cctv18 = CCTV18-style continue/audit."
         required: true
@@ -75,7 +80,7 @@ on:
         description: "Display name shown in kernel-manager apps and the flash banner (does NOT change uname -r). Customise this freely, e.g. 'OX13-ReSukiSU'."
         required: false
         type: string
-        default: "PJZ110 | ReSukiSU [Inline StockLike] + CCTV18 SUSFS (OP-OX)"
+        default: "PJZ110 | BakaSU [Inline StockLike] + CCTV18 SUSFS (OP-OX)"
       optimise:
         description: "O2 is stable daily-driver default. O3 is test-only."
         required: true
@@ -166,7 +171,7 @@ permissions:
 
 jobs:
   build:
-    name: "${{ inputs.profile }} | ReSukiSU=${{ inputs.resukisu_ref }} | Hook=${{ inputs.hook_mode }} | SUSFS=${{ inputs.SUSFS }}"
+    name: "${{ inputs.profile }} | BakaSU=${{ inputs.resukisu_ref }} | Hook=${{ inputs.hook_mode }} | SUSFS=${{ inputs.SUSFS }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
@@ -261,7 +266,7 @@ jobs:
           mkdir -p kernel_workspace _ox_debug artifacts
 
           echo "==> Cloning CCTV18 build assets only"
-          # v108: pin the CCTV18 assets repo. It supplies the CVE patch, config.patch
+          # v109: pin the CCTV18 assets repo. It supplies the CVE patch, config.patch
           # and the optional feature patches, so an unpinned HEAD can change the build.
           git clone "https://github.com/${CCTV18_BUILD_REPO}.git" cctv18_assets
           git -C cctv18_assets checkout -q "${CCTV18_ASSETS_REF}" || {
@@ -270,7 +275,7 @@ jobs:
 
           cd kernel_workspace
           echo "==> Downloading CCTV18 OP13 common kernel source at pinned commit ${CCTV18_KERNEL_COMMIT}"
-          # v108: pin the source to a COMMIT zip, not the moving branch head, so a
+          # v109: pin the source to a COMMIT zip, not the moving branch head, so a
           # known-good build is reproducible. Falls back to the branch head only if
           # the commit archive is unavailable.
           aria2c -s16 -x16 -k1M --retry-wait=5 --max-tries=5 \
@@ -339,7 +344,7 @@ jobs:
           ccache -z || true
           ccache -s || true
 
-      - name: "Integrate ReSukiSU (official setup.sh)"
+      - name: "Integrate BakaSU (formerly ReSukiSU; official setup.sh)"
         id: resukisu
         shell: bash
         run: |
@@ -356,7 +361,7 @@ jobs:
             echo "==> Resolving best available ReSukiSU ref"
             selected_ref=""
             for cand in main stable; do
-              if git ls-remote --exit-code --heads https://github.com/ReSukiSU/ReSukiSU.git "$cand" >/dev/null 2>&1 || git ls-remote --exit-code --tags https://github.com/ReSukiSU/ReSukiSU.git "$cand" >/dev/null 2>&1; then
+              if git ls-remote --exit-code --heads https://github.com/Baka-SU/BakaSU.git "$cand" >/dev/null 2>&1 || git ls-remote --exit-code --tags https://github.com/Baka-SU/BakaSU.git "$cand" >/dev/null 2>&1; then
                 selected_ref="$cand"
                 break
               fi
@@ -373,9 +378,9 @@ jobs:
 
           # Clean ReSukiSU lane: use ReSukiSU's own setup script only.
           # No SukiSU Ultra / KernelSU-Next / WildKernels glue is imported here.
-          # v108: fetch setup.sh from the PINNED ReSukiSU commit, not main, so the
+          # v109: fetch setup.sh from the PINNED ReSukiSU commit, not main, so the
           # installer script matches the driver commit we check out.
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/${RESUKISU_SETUP_REF}/kernel/setup.sh" | bash -s "$selected_ref"
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/${RESUKISU_SETUP_REF}/kernel/setup.sh" | bash -s "$selected_ref"
 
           if [ -d KernelSU ]; then
             KSU_TREE="KernelSU"
@@ -446,7 +451,7 @@ jobs:
           rm -rf susfs4ksu
 
           echo "==> Cloning CCTV18 SUSFS only: cctv18/susfs4oki @ ${{ inputs.susfs_ref }}"
-          # v108: susfs_ref may be a BRANCH/TAG or a COMMIT SHA.
+          # v109: susfs_ref may be a BRANCH/TAG or a COMMIT SHA.
           # `git clone --branch` only accepts branch/tag names, so a pinned SHA has
           # to be fetched explicitly (verified working: GitHub allows shallow
           # fetch-by-SHA on this repo).
@@ -490,7 +495,7 @@ jobs:
           echo "Reason: keep this build focused on ReSukiSU inline SUSFS first; avoid SELinux policy-query link issues seen on SukiSU builtin."
 
           cd common
-          # ---- v108: upstream security fix CVE-2026-43499 (rtmutex) ----
+          # ---- v109: upstream security fix CVE-2026-43499 (rtmutex) ----
           # Fixes a NULL-pointer dereference in remove_waiter(): when called via
           # rt_mutex_start_proxy_lock(), waiter->task may be NULL (never enqueued),
           # and the old code dereferenced it unconditionally.
@@ -525,14 +530,14 @@ jobs:
             echo "CVE-2026-43499: patch file not found" > "$GITHUB_WORKSPACE/_ox_debug/cve-status.txt"
           fi
 
-          # ---- v108: driver/SUSFS pairing check ----
+          # ---- v109: driver/SUSFS pairing check ----
           # The su hook is guarded in fs/exec.c. CCTV18 SUSFS 525c450 renamed that
           # guard from susfs_is_current_proc_umounted() to
           # susfs_is_current_proc_no_su(). ReSukiSU 03b60f2 switched the driver to
           # set the matching no_su mark. Mixing generations makes the new guard
           # read the old umounted mark as "no su", so `su` is skipped for every app
           # and shell while apps using binder/supercall still get root.
-          # v108 PAIRING GUARD FIX. The v108 guard ran from kernel_workspace/common
+          # v108 PAIRING GUARD FIX. The v107 guard ran from kernel_workspace/common
           # but used paths relative to kernel_workspace (susfs4ksu/..., KernelSU/...),
           # so with grep -s the checks silently found nothing and the guard ALWAYS
           # wrote "pairing: OK (susfs=0 driver=0)" -- it could never fail, even on a
@@ -551,7 +556,7 @@ jobs:
           fi
           SUSFS_NEW=0; DRV_NEW=0
           grep -q "susfs_is_current_proc_no_su" "$SUSFS_DEF" && SUSFS_NEW=1
-          # v108: match the DRIVER's own no_su setter, not the ambiguous
+          # v109: match the DRIVER's own no_su setter, not the ambiguous
           # ksu_is_current_proc_unprivillege alias (which exists as a `#define ... false`
           # stub in the non-SUSFS branch too and would false-positive an old driver).
           grep -rq "susfs_set_current_proc_no_su" "$KW/KernelSU/kernel/" 2>/dev/null && DRV_NEW=1
@@ -562,6 +567,81 @@ jobs:
             exit 1
           fi
           echo "pairing: OK (susfs=$SUSFS_NEW driver=$DRV_NEW)" > "$GITHUB_WORKSPACE/_ox_debug/pairing.txt"
+
+          # ---- v109: BakaSU + CCTV18 SUSFS integration ----
+          # BakaSU main (48fa4bb, 2026-10-10) ends kernel/tools/susfs_compat.mk with
+          #     $(error Please wait susfs update.)
+          # Reason given upstream: SUSFS's SELinux-hide hooks have not picked up
+          # KernelSU #3877 (timing side-channel fix in selinux hide), and users
+          # running them got detected. CCTV18 SUSFS 3f6aae5 still replaces that
+          # logic with its own my_security_* path (no live-sidtab sync), so simply
+          # deleting the gate would bring the detection back.
+          #
+          # What v109 does instead (OX_BAKASU_SELINUX_HIDE_OWNER=bakasu, default):
+          #  1. SUSFS's SELinux-hide sections (security/selinux/hooks.c,
+          #     selinuxfs.c, ss/services.c) are NOT applied. Every other SUSFS
+          #     feature is applied unchanged (fs/*, avc.c log spoof, kallsyms,
+          #     uname, cmdline, input, reboot, sys, mm).
+          #  2. BakaSU's susfs_compat.mk then finds no manual SELinux-hide hook
+          #     and builds its OWN selinux_hide (runtime write_op patching, with
+          #     the #3877 fix) -- the path BakaSU ships for non-SUSFS kernels.
+          #  3. Only then is the gate removed. Its exact 3 lines are checked
+          #     first; if BakaSU changes the file, the build stops instead of
+          #     guessing. The file is marked assume-unchanged so the driver's
+          #     version string does not get a "-dirty" suffix.
+          # Sandbox-verified: SUSFS objects + full BakaSU driver compile, all
+          # cross-symbols resolve, BakaSU logs no "selinux_hide manual hook".
+          SEL_OWNER="${OX_BAKASU_SELINUX_HIDE_OWNER:-bakasu}"
+          SUSFS_PATCH_FILE="50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
+          case "$SEL_OWNER" in
+            bakasu)
+              python3 - "$SUSFS_PATCH_FILE" <<'PY'
+          import re, sys
+          path = sys.argv[1]
+          src = open(path, encoding='utf-8', errors='surrogateescape').read()
+          parts = re.split(r'(?m)^(?=diff --git )', src)
+          drop = {'security/selinux/hooks.c', 'security/selinux/selinuxfs.c', 'security/selinux/ss/services.c'}
+          kept, dropped = [], []
+          for p in parts:
+              m = re.match(r'diff --git a/(\S+) b/', p)
+              if m and m.group(1) in drop:
+                  dropped.append(m.group(1))
+                  continue
+              kept.append(p)
+          open(path, 'w', encoding='utf-8', errors='surrogateescape').write(''.join(kept))
+          print('SUSFS SELinux-hide sections left to BakaSU:', ' '.join(dropped) or 'none found')
+          PY
+              echo "selinux-hide owner: bakasu (SUSFS hooks.c/selinuxfs.c/services.c sections not applied)" \
+                | tee "$GITHUB_WORKSPACE/_ox_debug/selinux-hide-owner.txt"
+              ;;
+            susfs)
+              echo "::warning::OX_BAKASU_SELINUX_HIDE_OWNER=susfs: SUSFS SELinux-hide hooks applied. These lack KernelSU #3877 (timing side-channel fix); BakaSU blocks this combination upstream for that reason."
+              echo "selinux-hide owner: susfs (no #3877 fix)" | tee "$GITHUB_WORKSPACE/_ox_debug/selinux-hide-owner.txt"
+              ;;
+            *)
+              echo "::error::OX_BAKASU_SELINUX_HIDE_OWNER must be 'bakasu' or 'susfs' (got '$SEL_OWNER')."
+              exit 1
+              ;;
+          esac
+
+          GATE_MK="$KW/KernelSU/kernel/tools/susfs_compat.mk"
+          if [ -f "$GATE_MK" ] && grep -q 'Please wait susfs update' "$GATE_MK"; then
+            gate_lines="$(grep -cE 'susfs has NOT update with latest KernelSU source|Please wait simonpunk update|\$\(error Please wait susfs update\.\)' "$GATE_MK" || true)"
+            all_errors="$(grep -c '\$(error' "$GATE_MK" || true)"
+            if [ "$gate_lines" != "3" ] || [ "$all_errors" != "1" ]; then
+              echo "::error::BakaSU susfs_compat.mk gate is not the known 3-line block (matched=$gate_lines, errors=$all_errors). Review it before building."
+              cp -f "$GATE_MK" "$GITHUB_WORKSPACE/_ox_debug/susfs_compat.mk.unexpected" || true
+              exit 1
+            fi
+            sed -i -E '/susfs has NOT update with latest KernelSU source/d; /Please wait simonpunk update/d; /\$\(error Please wait susfs update\.\)/d' "$GATE_MK"
+            if grep -q '\$(error' "$GATE_MK"; then
+              echo "::error::BakaSU SUSFS gate removal did not take effect."; exit 1
+            fi
+            git -C "$KW/KernelSU" update-index --assume-unchanged kernel/tools/susfs_compat.mk || true
+            echo "bakasu susfs gate: lifted (selinux-hide owner=$SEL_OWNER)" | tee "$GITHUB_WORKSPACE/_ox_debug/bakasu-susfs-gate.txt"
+          else
+            echo "bakasu susfs gate: not present at this ref (nothing to lift)" | tee "$GITHUB_WORKSPACE/_ox_debug/bakasu-susfs-gate.txt"
+          fi
 
           echo "==> Applying CCTV18 SUSFS patch with policy: ${{ inputs.susfs_patch_policy }}"
           set +e
@@ -600,7 +680,7 @@ jobs:
 
 
 
-          # ---- v108: verify the SUSFS su-hook guard is the FIXED variant ----
+          # ---- v109: verify the SUSFS su-hook guard is the FIXED variant ----
           # History: CCTV18 susfs4oki 83dcd81 (2026-08-15) guarded the su hook in
           # fs/exec.c with susfs_is_current_proc_umounted(). That flag is set for
           # every SUSFS-"umounted" process -- i.e. every zygote-spawned app AND every
@@ -616,7 +696,7 @@ jobs:
             echo "==> su-hook guard OK: fs/exec.c uses susfs_is_current_proc_no_su() (fixed variant)."
             echo "su-hook guard: no_su (FIXED)" > "$GITHUB_WORKSPACE/_ox_debug/su-hook-guard.txt"
           elif grep -q "susfs_is_current_proc_umounted" fs/exec.c 2>/dev/null; then
-            # v108: OLD generation is VALID when the driver is also old generation.
+            # v109: OLD generation is VALID when the driver is also old generation.
             # The pairing check above is authoritative; this is informational only.
             echo "==> su-hook guard: susfs_is_current_proc_umounted() (OLD generation)."
             echo "    Valid only with an OLD-generation driver (e.g. sukisu 6c13a06)."
@@ -743,7 +823,7 @@ jobs:
           set_n() { scripts/config --file "$cfg" -d "$(cfg_sym "$1")" || true; }
           set_str() { scripts/config --file "$cfg" --set-str "$(cfg_sym "$1")" "$2" || true; }
 
-          echo "==> Applying v108 ReSukiSU daily-driver config profile: ${{ inputs.profile }}"
+          echo "==> Applying v109 ReSukiSU daily-driver config profile: ${{ inputs.profile }}"
           set_y CONFIG_KSU
 
           if [ "${{ inputs.kpm_enable }}" = "true" ]; then
@@ -791,7 +871,7 @@ jobs:
           esac
 
           if [ "${{ inputs.SUSFS }}" = "On" ]; then
-            # v108: only the 10 SUSFS options that ACTUALLY EXIST in the root driver.
+            # v109: only the 10 SUSFS options that ACTUALLY EXIST in the root driver.
             # Verified against the Kconfig of all three projects (SukiSU-Ultra,
             # ReSukiSU, pershoot/KernelSU-Next) -- each defines exactly these 10.
             # REMOVED because no project defines them, so olddefconfig silently
@@ -897,7 +977,7 @@ jobs:
               CONFIG_IP6_NF_TARGET_MASQUERADE; do
               set_y "$opt"
             done
-            # v108: symbol-name corrections verified against the real 6.6.118
+            # v109: symbol-name corrections verified against the real 6.6.118
             # net/netfilter Kconfig. The following DID NOT EXIST and were silently
             # dropped by olddefconfig, so these features were never actually built:
             #   CONFIG_NETFILTER_XT_TARGET_HL -> real symbol is ..._TARGET_HL
@@ -908,7 +988,7 @@ jobs:
             # The extra IP_SET_* variants match CCTV18's own builder and make ipset
             # actually usable for firewall / ad-block modules.
             scripts/config --file "$cfg" --set-val CONFIG_IP_SET_MAX 65534 || true
-            # v108: CCTV18 warns that CONFIG_IP6_NF_NAT=y triggers a "device has an
+            # v109: CCTV18 warns that CONFIG_IP6_NF_NAT=y triggers a "device has an
             # internal problem" boot banner on some units. Their fix is config.patch,
             # which hides the symbol from config_data.gz without disabling the feature.
             # Apply it best-effort so proxy users don't get the scary boot warning.
@@ -1009,7 +1089,7 @@ jobs:
           echo "==> Final config scan"
           grep -E 'CONFIG_KSU|CONFIG_KPM|CONFIG_KALLSYMS|CONFIG_LOCALVERSION|CONFIG_TCP_CONG_BBR|CONFIG_DEFAULT_BBR|CONFIG_IP_SET|CONFIG_NTSYNC|CONFIG_LTO|CONFIG_CC_OPTIMIZE|CONFIG_NETFILTER_XT_TARGET_HL|CONFIG_ADIOS|CONFIG_BBG|CONFIG_BASEBAND|CONFIG_ZRAM|CONFIG_ZSMALLOC|CONFIG_CRYPTO_LZ4|CONFIG_LZ4|CONFIG_ZSTD' out/.config | tee "$GITHUB_WORKSPACE/_ox_debug/config-scan.txt" || true
 
-          # ---- v108 SUSFS config audit ----
+          # ---- v109 SUSFS config audit ----
           # Verifies that every SUSFS option we asked for actually landed as =y in
           # the FINAL .config. Previously four options were requested that no root
           # project defines, so olddefconfig silently dropped them and the build
@@ -1063,6 +1143,18 @@ jobs:
           echo "==> Building Image"
           make -j"$(nproc --all)" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$GITHUB_WORKSPACE/_ox_debug/build.log"
 
+          # v109: confirm who ended up implementing SELinux hiding.
+          if grep -q "selinux_hide manual hook found" "$GITHUB_WORKSPACE/_ox_debug/build.log"; then
+            sel_impl="susfs-hooks"
+          else
+            sel_impl="bakasu-own"
+          fi
+          echo "selinux_hide implementation in this Image: $sel_impl" | tee -a "$GITHUB_WORKSPACE/_ox_debug/selinux-hide-owner.txt"
+          if [ "${OX_BAKASU_SELINUX_HIDE_OWNER:-bakasu}" = "bakasu" ] && [ "$sel_impl" != "bakasu-own" ]; then
+            echo "::error::Expected BakaSU's own selinux_hide, but the build used SUSFS's manual hook. The SUSFS SELinux-hide filter did not take effect."
+            exit 1
+          fi
+
           image="out/arch/arm64/boot/Image"
           if [ ! -s "$image" ]; then
             echo "::error::Kernel Image was not produced."
@@ -1070,8 +1162,8 @@ jobs:
             exit 1
           fi
 
-          cp -f "$image" "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v108"
-          sha256sum "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v108" | tee "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v108.sha256"
+          cp -f "$image" "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v109"
+          sha256sum "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v109" | tee "$GITHUB_WORKSPACE/artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v109.sha256"
 
           uts="unknown"
           if [ -f out/include/generated/utsrelease.h ]; then
@@ -1087,13 +1179,13 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf ak3_work
-          # v108: pin AnyKernel3. An unpinned master already broke flashing once
+          # v109: pin AnyKernel3. An unpinned master already broke flashing once
           # (the uppercase-variable rename); pin it so a fresh build is reproducible.
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ak3_work
           git -C ak3_work fetch -q --depth=1 origin "${AK3_REF}" && git -C ak3_work checkout -q FETCH_HEAD || \
             echo "::warning::Could not pin AnyKernel3 to ${AK3_REF}; using master HEAD."
           git -C ak3_work rev-parse HEAD | tee "$GITHUB_WORKSPACE/_ox_debug/anykernel3_commit.txt"
-          # --- AK3 naming-convention guard (v108) ---
+          # --- AK3 naming-convention guard (v109) ---
           # AK3 renamed its anykernel.sh settings to UPPERCASE. We write both
           # spellings, but if upstream ever changes convention AGAIN this guard
           # makes it obvious in the log instead of silently shipping a zip that
@@ -1127,12 +1219,12 @@ jobs:
           RAMFIXSVC
           chmod 0755 ak3_work/ramfix/service.sh
           rm -rf ak3_work/.git ak3_work/.github ak3_work/README.md || true
-          cp -f artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v108 ak3_work/Image
+          cp -f artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v109 ak3_work/Image
 
           cat > ak3_work/anykernel.sh <<'AK3'
           ### AnyKernel3 Ramdisk Mod Script
           ## osm0sis @ xda-developers
-          ## OX1D3X3 OP13 ReSukiSU + CCTV18 clean SUSFS package
+          ## OX1D3X3 OP13 BakaSU (ReSukiSU) + CCTV18 clean SUSFS package
 
           ### AnyKernel setup
           # global properties
@@ -1158,7 +1250,7 @@ jobs:
           ### AnyKernel install
           ## boot shell variables
           # OP13 / PJZ110 is A/B slot device. Use partition-name detection, not old omap path.
-          # v108 FLASH FIX: AnyKernel3 upstream renamed these settings to UPPERCASE
+          # v109 FLASH FIX: AnyKernel3 upstream renamed these settings to UPPERCASE
           # (BLOCK, IS_SLOT_DEVICE, ...). This workflow clones AK3 master unpinned,
           # so a fresh build picks up the new ak3-core.sh, which IGNORES the old
           # lowercase names. With $BLOCK unset, AK3 cannot resolve the boot
@@ -1194,13 +1286,13 @@ jobs:
           ui_print '                 /_/ \_\  |_|'
           ui_print '===================================================='
           ui_print ' '
-          ui_print 'PJZ110 | ReSukiSU [Inline StockLike Daily] + CCTV18 SUSFS'
+          ui_print 'PJZ110 | BakaSU [Inline StockLike Daily] + CCTV18 SUSFS'
           ui_print 'Kernel : 6.6.118-${{ inputs.kernel_suffix }}'
           ui_print 'Hook   : ${{ inputs.hook_mode }} (target: inline SUSFS)'
           ui_print 'Audit  : CONFIG_KSU + CONFIG_KSU_SUSFS + inline hook audit'
           ui_print 'Build  : #${{ github.run_number }} (${{ inputs.kernel_suffix }})'
           ui_print 'Builder: @Ox1d3x3'
-          ui_print 'Credits: @ReSukiSU, @cctv18, osm0sis, @mrcxlinux'
+          ui_print 'Credits: @Baka-SU (ex-ReSukiSU), @cctv18, osm0sis, @mrcxlinux'
           ui_print 'Source : CCTV18 susfs4oki only - no mixed SUSFS patch tree'
           ui_print "ZRAM   : kernel config=${{ inputs.zram_module == 'On' }} / preferred=${{ inputs.zram_comp }}"
           ui_print ' '
@@ -1271,7 +1363,7 @@ jobs:
           chmod 0755 ak3_work/anykernel.sh
 
           cat > ak3_work/OX_CCTV18_CLEAN_BUILD_INFO.txt <<EOF
-          OX1D3X3 OP13 ReSukiSU + CCTV18 INLINE SUSFS v108
+          OX1D3X3 OP13 BakaSU + CCTV18 INLINE SUSFS v109
           Device: OnePlus 13 / sun / PJZ110
           Kernel source: cctv18/android_kernel_common_oneplus_sm8750 @ ${{ env.CCTV18_KERNEL_REF }}
           Build assets: cctv18/oppo_oplus_realme_sm8750
@@ -1290,7 +1382,7 @@ jobs:
           EOF
           sed -i 's/^          //' ak3_work/OX_CCTV18_CLEAN_BUILD_INFO.txt
 
-          zip_name="AK3_OP13_ReSukiSU_CCTV18_inline_stocklike_v108_${{ github.run_number }}_FLASH_THIS.zip"
+          zip_name="AK3_OP13_ReSukiSU_CCTV18_inline_stocklike_v109_${{ github.run_number }}_FLASH_THIS.zip"
           ( cd ak3_work && zip -r9 "../artifacts/$zip_name" . >/dev/null )
           sha256sum "artifacts/$zip_name" | tee "artifacts/$zip_name.sha256"
 
@@ -1357,7 +1449,7 @@ jobs:
 
           if [ -f "$GITHUB_STEP_SUMMARY" ]; then
             {
-              echo "# OP13 ReSukiSU + CCTV18 Inline StockLike Daily v108"
+              echo "# OP13 BakaSU (ReSukiSU) + CCTV18 Inline StockLike Daily v109"
               echo ""
               echo "## Verdict"
               echo "- Main flashable zip uses fixed AnyKernel3 OP13 boot detection."
@@ -1374,7 +1466,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: OP13-RESUKISU-CCTV18-INLINE-STOCKLIKE-v108-${{ github.run_number }}
+          name: OP13-RESUKISU-CCTV18-INLINE-STOCKLIKE-v109-${{ github.run_number }}
           path: |
             artifacts/**
             _ox_debug/**
@@ -1387,11 +1479,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -s artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v108 ]; then
-            echo "::error::Build failed before producing Image. Download OP13-RESUKISU-CCTV18-INLINE-STOCKLIKE-v108 debug artifact."
+          if [ ! -s artifacts/Image_OP13_ReSukiSU_CCTV18_inline_stocklike_v109 ]; then
+            echo "::error::Build failed before producing Image. Download OP13-RESUKISU-CCTV18-INLINE-STOCKLIKE-v109 debug artifact."
             exit 1
           fi
-          if [ "true" = "true" ] && ! ls artifacts/AK3_OP13_ReSukiSU_CCTV18_inline_stocklike_v108_*_FLASH_THIS.zip >/dev/null 2>&1; then
+          if [ "true" = "true" ] && ! ls artifacts/AK3_OP13_ReSukiSU_CCTV18_inline_stocklike_v109_*_FLASH_THIS.zip >/dev/null 2>&1; then
             echo "::error::Image built but AnyKernel3 flashable ZIP was not produced."
             exit 1
           fi
