@@ -55,7 +55,7 @@ same CCTV18 OP13 source, toolchain and SUSFS tree:
 | Lane | Workflow | Root solution | Pick it if… |
 |---|---|---|---|
 | **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) | you want SukiSU Ultra with KPM + inline SUSFS |
-| **ReSukiSU** | `Build_ReSukiSU.yml` | [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) (SukiSU fork) | you want the SukiSU feature set with the ReSukiSU manager stack |
+| **ReSukiSU** (Recommended)| `Build_ReSukiSU.yml` | [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) (SukiSU fork) | you want the SukiSU feature set with the ReSukiSU manager stack |
 
 > **KernelSU‑Next lane is DEPRECATED** (archived at
 > [`docs/deprecated/Build_KSUN.yml.deprecated`](./docs/deprecated/Build_KSUN.yml.deprecated)).
