@@ -703,6 +703,34 @@ jobs:
             grep -n "KSU_SULOG_EVENT_IOCTL_GRANT_ROOT" common/drivers/kernelsu/sulog/event.c | tee -a "$GITHUB_WORKSPACE/_ox_debug/sukisu-compile-compat.txt" || true
           fi
 
+          # ---- v112: pkg_observer repair (upstream builtin bug, 2026-10-08) ----
+          # SukiSU builtin c895920 ("pkg_observer: defer track_throne to task_work",
+          # cherry-picked from KernelSU #3871) calls
+          #     track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS);
+          # but that constant is defined on NO SukiSU branch (builtin, main, dev):
+          # track_throne() takes `bool prune_only` everywhere. Every builtin commit
+          # from c895920 on fails with "use of undeclared identifier". Official
+          # KernelSU's identical code passes `false` (full scan), so the repair
+          # restores exactly the upstream call. Guarded: it only acts when the token
+          # is used AND defined nowhere, so it becomes a no-op once SukiSU fixes it.
+          PKGOBS="KernelSU/kernel/manager/pkg_observer.c"
+          if [ -f "$PKGOBS" ] && grep -q "TRACK_THRONE_FORCE_SYNCHRONOUS" "$PKGOBS"; then
+            if grep -rqE "define[[:space:]]+TRACK_THRONE_FORCE_SYNCHRONOUS|TRACK_THRONE_FORCE_SYNCHRONOUS[[:space:]]*=" KernelSU/kernel; then
+              echo "==> pkg_observer: TRACK_THRONE_FORCE_SYNCHRONOUS is defined upstream now; no repair needed."
+              echo "pkg_observer repair: not needed (constant defined)" | tee -a "$GITHUB_WORKSPACE/_ox_debug/sukisu-compile-compat.txt"
+            else
+              sed -i 's/track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS)/track_throne(false)/g' "$PKGOBS"
+              if grep -q "TRACK_THRONE_FORCE_SYNCHRONOUS" "$PKGOBS"; then
+                echo "::error::pkg_observer repair did not take effect; inspect $PKGOBS."
+                exit 1
+              fi
+              echo "==> pkg_observer: undefined TRACK_THRONE_FORCE_SYNCHRONOUS -> false (official KernelSU behaviour)."
+              echo "pkg_observer repair: applied (track_throne(false))" | tee -a "$GITHUB_WORKSPACE/_ox_debug/sukisu-compile-compat.txt"
+            fi
+          else
+            echo "pkg_observer repair: not needed" | tee -a "$GITHUB_WORKSPACE/_ox_debug/sukisu-compile-compat.txt"
+          fi
+
       - name: "Apply SUSFS"
         if: ${{ inputs.SUSFS == 'On' }}
         shell: bash
@@ -798,7 +826,7 @@ jobs:
           # the matching no_su mark. Mixing generations makes the new guard read the
           # old umounted mark as "no su", so `su` is skipped for every app and shell
           # while apps using binder/supercall still get root.
-          # v111 PAIRING GUARD FIX. The v111 guard ran from kernel_workspace/common
+          # v110 PAIRING GUARD FIX. The v109 guard ran from kernel_workspace/common
           # but used paths relative to kernel_workspace, so with grep -s it always
           # found nothing and wrote "pairing: OK (susfs=0 driver=0)" -- it could never
           # fail. Absolute paths + hard-fail on missing files fix that.
@@ -908,6 +936,40 @@ jobs:
             echo "For the stable daily-driver SukiSU lane, disable only the source-level SELinux policy-query replacement blocks in hooks.c and selinuxfs.c."
             echo "This does not import another SUSFS tree and does not touch the core SUSFS fs/include payload."
           } | tee "$GITHUB_WORKSPACE/_ox_debug/selinux-policy-query-guard.log"
+
+          # ---- v112: guard keyed to the VERIFIED pair ----
+          # The guard existed because older SukiSU builtin + SUSFS failed the final
+          # link on the SELinux-hide symbols (v77). It also meant SukiSU's
+          # selinux_hide feature had NO kernel hooks at all on this lane.
+          # v112 compile-verified sukisu 2d1de62 + susfs 3f6aae5: hooks.c,
+          # selinuxfs.c, ss/services.c and the full driver compile, and every
+          # driver<->SUSFS symbol (backup_sepolicy, fake_status,
+          # fake_status_initialize_key, initialize_fake_status, my_security_*,
+          # ksu_selinux_hide_*) resolves to a global definition. For THAT pair the
+          # hooks stay ON (they are dormant until the selinux_hide feature is
+          # enabled). Any other pair keeps the guard, i.e. exactly the v111
+          # behaviour, because only a real link proves compatibility.
+          # Env overrides: OX_SELINUX_HIDE_HOOKS=on|off (default: auto).
+          VERIFIED_SUKI="2d1de629d4204d25cc0c8927b959d9135d9781f4"
+          VERIFIED_SUSFS="3f6aae536724af0df3dfa15f932034d14a5dbc5c"
+          got_suki="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/KernelSU" rev-parse HEAD 2>/dev/null || echo unknown)"
+          got_susfs="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/susfs4ksu" rev-parse HEAD 2>/dev/null || echo unknown)"
+          mode="${OX_SELINUX_HIDE_HOOKS:-auto}"
+          hooks_on=0
+          case "$mode" in
+            on)  hooks_on=1 ;;
+            off) hooks_on=0 ;;
+            *)   [ "$got_suki" = "$VERIFIED_SUKI" ] && [ "$got_susfs" = "$VERIFIED_SUSFS" ] && hooks_on=1 ;;
+          esac
+          echo "==> selinux-hide hooks: mode=$mode sukisu=$got_suki susfs=$got_susfs -> hooks_on=$hooks_on" \
+            | tee -a "$GITHUB_WORKSPACE/_ox_debug/selinux-policy-query-guard.log"
+          if [ "$hooks_on" = "1" ]; then
+            echo "selinux-hide hooks: ENABLED (verified pair or forced on; no guard applied)" \
+              > "$GITHUB_WORKSPACE/_ox_debug/selinux-policy-query-guard-files.txt"
+            exit 0
+          fi
+          echo "==> Not the verified pair (or forced off): applying the v111 guard." \
+            | tee -a "$GITHUB_WORKSPACE/_ox_debug/selinux-policy-query-guard.log"
 
           python3 - <<'PY'
           from pathlib import Path
