@@ -1172,20 +1172,8 @@ jobs:
           case "${{ inputs.hook_mode }}" in
             inline_susfs)
               # SUSFS-inlined hooks ONLY (CONFIG_KSU_NONE_HOOK).
-              #
-              # KNOWN LIMITATION -- `su` from a shell does NOT work in this mode.
-              # CCTV18's SUSFS patch inlines this into fs/exec.c:
-              #     if (likely(susfs_is_current_proc_umounted()))
-              #             goto orig_flow;               <-- skips sucompat
-              #     if (static_branch_likely(&ksu_su_compat_enabled))
-              #             ksu_handle_execveat_sucompat(...);
-              # Any process SUSFS marked "umounted" (every zygote-spawned app, and
-              # shell contexts) jumps past the su hook, so execve of /system/bin/su
-              # is never redirected and fails ENOENT ("cannot execute: required file
-              # not found"). The stat/faccessat hooks are inlined WITHOUT that guard,
-              # which is why `su` still LOOKS present. Apps taking root via the
-              # binder/supercall path are unaffected -- only `su` via execve breaks.
-              # NONE_HOOK also disables SukiSU's own hooks, so there is no fallback.
+              # The pinned SUSFS uses no_su session gating and static-key switches.
+              # The pinned builtin patch matches that cross-translation-unit ABI.
               set_y CONFIG_KSU_NONE_HOOK
               set_n CONFIG_KSU_MANUAL_HOOK
               set_n CONFIG_KSU_KPROBES_HOOK
@@ -1490,6 +1478,17 @@ jobs:
           echo "==> Building SukiSU driver version ${SUKISU_DRIVER_VERSION:-unknown}."
 
           make -j"$(nproc --all)" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$GITHUB_WORKSPACE/_ox_debug/build.log"
+
+          actual_ref="$(cat "$GITHUB_WORKSPACE/_ox_debug/sukisu_commit.txt")"
+          if [ "$actual_ref" = "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26" ]; then
+            llvm-readelf --symbols --wide out/vmlinux | awk '
+              $NF == "ksu_su_compat_enabled" {
+                print; found = 1
+                if ($3 <= 1 || $4 != "OBJECT") invalid = 1
+              }
+              END { if (!found || invalid) exit 1 }
+            ' | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-sucompat-symbol.txt"
+          fi
 
           image="out/arch/arm64/boot/Image"
           if [ ! -s "$image" ]; then

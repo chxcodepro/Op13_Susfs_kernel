@@ -20,19 +20,28 @@ flag/parameter implementation, then declare 5. Keep the Android 15 / 6.6.118
 kernel base unchanged and pair the new driver with CCTV18 SUSFS 3f6aae5
 (v2.3.0), which calls the now-available ksu_install_su_fd().
 
-The UAPI 3 audit follows upstream commit 86e9b3b: scoped descriptor context,
+The UAPI 3 audit follows upstream [86e9b3b](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/86e9b3bf00724b0f649709b8317f0475caf9e8ae): scoped descriptor context,
 restricted ioctl permissions, profile-aware wrapper credential override, and
 post-exec descriptor installation are present. The wrapper does not need to
 call ksu_is_su_session_fd(); that permission check belongs to the dispatcher.
 The LSM header change in that commit is formatting only. CCTV18's exec hook
 installs the descriptor only for a successful su session after profile setup.
-UAPI 4 follows dda78702 and UAPI 5 follows 7ef2dbb7.
+UAPI 4 follows [dda78702](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/dda78702bef1841e70d5b26150b12c03b782e175)
+and UAPI 5 follows [7ef2dbb7](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/7ef2dbb7fa68722c142f5266f0a7b95c8fb6e7e9).
 
 The first repair build, 38942212803, exposes two additional builtin compile
 defects: the manager ioctl is used but not declared, and the dynamic-manager
 scan references an out-of-scope pkg variable. Add the release's exact manager
 ioctl definition and skip KSU_PACKAGE_NAME in that scan, retaining signature
 verification and builtin-manager priority.
+
+CCTV18 SUSFS v2.3.0 declares ksu_su_compat_enabled as static_key_true in
+fs/exec.c, fs/open.c, and fs/stat.c, but this builtin defines a bool. Align the
+driver definition, header, getter, setter, and non-SUSFS read with the static
+key contract. A plain bool can link across translation units while leaving
+static-branch toggling invalid; compilation alone does not establish this ABI.
+The build inspects the linked vmlinux symbol and rejects a missing or one-byte
+switch for this pinned driver, retaining the result in the debug artifact.
 
 Before building in auto mode, compare the actual driver's UAPI with the
 official Manager release source. Fail on mismatches instead of disguising an

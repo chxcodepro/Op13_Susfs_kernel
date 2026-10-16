@@ -119,9 +119,20 @@ files ([permission requirements](https://docs.github.com/en/rest/repos/contents#
 Branch protection must permit the token's owner to push; a rejected push
 fails the sync rather than bypassing protection.
 
-The build summary shows the resolved driver version and the selected source
-commit/ref before compilation. Selecting a version does not upgrade SukiSU or
-SUSFS source refs and does not establish firmware compatibility.
+The build summary shows the resolved driver version, selected source commit,
+and driver/Manager UAPI before compilation. `auto` reads the official release's
+UAPI header and rejects mismatches before overriding the numeric driver
+version. Explicit numeric selections remain available for legacy pairs and are
+marked `manual-unchecked`; they do not validate Manager compatibility.
+
+The SukiSU default pairs builtin `0af2cf9` with CCTV18 SUSFS `3f6aae5` (v2.3.0).
+The repository's pinned-source patch completes UAPI 5 reporting and bundled-LKM
+flags, and repairs the missing manager ioctl declaration and package-scan build
+error. It also aligns the su-compat switch with SUSFS's static-key ABI; the
+build checks that the linked symbol is not a one-byte bool. Scoped su-session
+descriptors and services start/skip handling are
+already present in that builtin source. Selecting a version does not upgrade
+SukiSU or SUSFS source refs and does not establish firmware compatibility.
 
 > **Optional patches are best‑effort.** `adios`, `baseband_guard`, `rekernel`,
 > `fengchi`/HMBIRD etc. are applied **only if** a matching CCTV18 patch exists
