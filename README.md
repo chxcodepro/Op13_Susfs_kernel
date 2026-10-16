@@ -133,6 +133,8 @@ build checks that the linked symbol is not a one-byte bool. Scoped su-session
 descriptors and services start/skip handling are
 already present in that builtin source. Selecting a version does not upgrade
 SukiSU or SUSFS source refs and does not establish firmware compatibility.
+See the [Manager compatibility decision](.agents/notes/implemented/bug-fix/2026-10-17-sukisu-uapi-manager-compatibility.md)
+for the source audit and successful repair build.
 
 > **Optional patches are best‑effort.** `adios`, `baseband_guard`, `rekernel`,
 > `fengchi`/HMBIRD etc. are applied **only if** a matching CCTV18 patch exists

@@ -1176,7 +1176,7 @@ jobs:
           echo "==> Requested SukiSU hook target: ${{ inputs.hook_mode }}"
           case "${{ inputs.hook_mode }}" in
             inline_susfs)
-              # SUSFS-inlined hooks ONLY (CONFIG_KSU_NONE_HOOK).
+              # SUSFS-inlined builtin hooks; legacy refs may use CONFIG_KSU_NONE_HOOK.
               # The pinned SUSFS uses no_su session gating and static-key switches.
               # The pinned builtin patch matches that cross-translation-unit ABI.
               set_y CONFIG_KSU_NONE_HOOK
@@ -1484,7 +1484,7 @@ jobs:
 
           make -j"$(nproc --all)" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$GITHUB_WORKSPACE/_ox_debug/build.log"
 
-          actual_ref="$(cat "$GITHUB_WORKSPACE/_ox_debug/sukisu_commit.txt")"
+          actual_ref="$(cat "$GITHUB_WORKSPACE/_ox_debug/sukisu_commit.txt" 2>/dev/null || true)"
           if [ "$actual_ref" = "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26" ]; then
             llvm-readelf --symbols --wide out/vmlinux | awk '
               $NF == "ksu_su_compat_enabled" {

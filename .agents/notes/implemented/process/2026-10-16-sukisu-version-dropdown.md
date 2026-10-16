@@ -37,7 +37,9 @@ compiling, so a cancelled build still exposes the selection. Source refs remain
 pinned independently of Manager versions, preserving the contract in the
 [KPM note](../bug-fix/2026-09-18-kpm-image-patching.md). That note partially
 overlaps version selection and keeps ownership of Image patching and source
-pairing; no existing decision is superseded.
+pairing. The later [Manager UAPI repair](../bug-fix/2026-10-17-sukisu-uapi-manager-compatibility.md)
+adds the auto-mode interface guard and changes the paired source defaults;
+this note continues to own dropdown synchronization and Chinese input copy.
 
 ## Alternatives considered
 

@@ -1,6 +1,6 @@
 # Agent Note: Match the SukiSU Manager UAPI with the builtin driver
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -10,14 +10,14 @@ reports UAPI 5 and disables full-feature compatibility. Overriding KSU_VERSION
 to 40994 does not change that interface. The red kernel-update warning is an
 actual protocol mismatch, not evidence that the new boot image failed to load.
 
-## Proposal
+## Decision
 
-Pin the official builtin driver to 0af2cf9cef7dc2239fa7ebb3f7898830a1087e26.
+The workflow pins the official builtin driver to 0af2cf9cef7dc2239fa7ebb3f7898830a1087e26.
 It already implements scoped su-session file descriptors (UAPI 3) and the
 services-stage start/skip result (UAPI 5), but its header still declares 2 and
-omits the UAPI 4 bundled-LKM flag plumbing. Backport that complete upstream
-flag/parameter implementation, then declare 5. Keep the Android 15 / 6.6.118
-kernel base unchanged and pair the new driver with CCTV18 SUSFS 3f6aae5
+omits the UAPI 4 bundled-LKM flag plumbing. The patch backports that upstream
+flag/parameter implementation and declares 5. The Android 15 / 6.6.118 kernel
+base stays unchanged; the new driver pairs with CCTV18 SUSFS 3f6aae5
 (v2.3.0), which calls the now-available ksu_install_su_fd().
 
 The UAPI 3 audit follows upstream [86e9b3b](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/86e9b3bf00724b0f649709b8317f0475caf9e8ae): scoped descriptor context,
@@ -31,13 +31,13 @@ and UAPI 5 follows [7ef2dbb7](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commi
 
 The first repair build, 38942212803, exposes two additional builtin compile
 defects: the manager ioctl is used but not declared, and the dynamic-manager
-scan references an out-of-scope pkg variable. Add the release's exact manager
-ioctl definition and skip KSU_PACKAGE_NAME in that scan, retaining signature
+scan references an out-of-scope pkg variable. The patch adds the release's exact
+manager ioctl definition and skips KSU_PACKAGE_NAME in that scan, retaining signature
 verification and builtin-manager priority.
 
 CCTV18 SUSFS v2.3.0 declares ksu_su_compat_enabled as static_key_true in
-fs/exec.c, fs/open.c, and fs/stat.c, but this builtin defines a bool. Align the
-driver definition, header, getter, setter, and non-SUSFS read with the static
+fs/exec.c, fs/open.c, and fs/stat.c, but the unpatched builtin defines a bool.
+The patch aligns the driver definition, header, getter, setter, and non-SUSFS read with the static
 key contract. A plain bool can link across translation units while leaving
 static-branch toggling invalid; compilation alone does not establish this ABI.
 The build inspects the linked vmlinux symbol and rejects a missing or one-byte
@@ -45,19 +45,19 @@ switch for this pinned driver, retaining the result in the debug artifact.
 
 Run 38943053604 reaches final link but finds an undefined
 context_struct_compute_av_fn in the driver's policy-query code. For this exact
-driver/SUSFS pair, add two thin ss/services.c wrappers around the kernel's own
+driver/SUSFS pair, the workflow adds two thin ss/services.c wrappers around the kernel's own
 context/access-vector and masked-permission audit helpers. This binds the
 driver to this kernel's real policy implementation without weak-symbol stubs,
 duplicating the policy algorithm, or enabling the guarded hooks.c/selinuxfs.c
 hiding replacements. The latter guard and its limitation remain unchanged.
 
-Before building in auto mode, compare the actual driver's UAPI with the
-official Manager release source. Fail on mismatches instead of disguising an
-old interface with a new numeric driver version. Preserve explicit legacy
-manual source/version choices. Keep final-Image KPM patching and packaging
-checks from the [KPM decision](../../implemented/bug-fix/2026-09-18-kpm-image-patching.md).
+Before building in auto mode, the workflow compares the actual driver's UAPI
+with the official Manager release source. Mismatches fail instead of disguising
+an old interface with a new numeric driver version. Explicit legacy manual
+source/version choices remain available, alongside final-Image KPM patching and packaging
+checks from the [KPM decision](2026-09-18-kpm-image-patching.md).
 That decision remains responsible for Image transformation; the
-[dropdown decision](../../implemented/process/2026-10-16-sukisu-version-dropdown.md)
+[dropdown decision](../process/2026-10-16-sukisu-version-dropdown.md)
 remains responsible for synchronized numeric choices. Neither decision alone
 establishes protocol compatibility.
 
@@ -70,17 +70,39 @@ establishes protocol compatibility.
 - Downgrading Manager avoids changing the boot image, but forfeits the user's
   chosen v4.2.1 Manager and does not correct future auto-version mismatches.
 
-## Acceptance criteria
+## Verification
 
-- The selected driver implements UAPI 3, 4, and 5, not just the numeric label.
-- Focused compatibility tests reject a UAPI 2 driver against Manager UAPI 5.
-- One SukiSU Actions build compiles, verifies matching UAPI values, patches
-  KPM, and packages the final Image consistently.
-- Deliver the repair artifact without flashing the phone automatically.
+The eight focused UAPI tests pass, including rejection of driver UAPI 2 against
+Manager UAPI 5 and preservation of explicit legacy manual mode. The 12 version
+sync tests remain valid. Changed shell blocks pass bash syntax checks and the
+workflow passes actionlint. The linked-symbol guard accepts a static key and
+rejects a bool or missing symbol.
 
-## Risks
+[Run 38944690920](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38944690920)
+at 3c97d2e completes successfully with no compiler warnings or errors. It records
+driver 40994 / v4.2.1-0af2cf9c and UAPI 5 against Manager v4.2.1 UAPI 5. The
+linked su-compat switch is a 16-byte OBJECT. Final configuration enables KSU,
+KPM, and all requested core SUSFS features; the existing SELinux query guard
+still covers hooks.c and selinuxfs.c.
 
-The newer builtin/SUSFS pair may expose compile failures that the old pin
-avoids. Validate on a dedicated branch and retain the currently booted image.
+The official KPM tool transforms the 38,529,536-byte compiler Image into a
+38,711,360-byte final Image. CI verifies both public checksums and package
+consistency. The downloaded flashable ZIP's Image also compares byte-for-byte
+with the standalone final Image. BUILD_INFO records UAPI 5/5 and KPM patched.
+The kernel release remains
+6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k. The package targets the
+active boot slot using BLOCK=boot, IS_SLOT_DEVICE=auto, SLOT_SELECT=active.
+
+Artifact 12065117719 is OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v111-14. Local copy:
+artifacts/run-38944690920/OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v111-14/artifacts/AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v111_14_FLASH_THIS.zip.
+
+## Consequences
+
+Auto builds reject incompatible UAPI pairs rather than producing a misleading
+numeric version. The compatibility patches apply only to their exact pinned
+source pairs, so changing sources requires a deliberate compatibility review.
+Numeric manual selections keep their original contract and unchecked status.
+
+The phone remains on its previous image; no flash or reboot is performed.
 Build and static checks do not replace the later, separately authorized phone
 check of Manager full-feature status, app grants, modules, and KPM.

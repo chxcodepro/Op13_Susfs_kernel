@@ -35,6 +35,9 @@ it can cross the SukiSU/SUSFS generation boundary.
 
 Daily dropdown refresh and its workflow-write credential are covered by
 [version synchronization](../process/2026-10-16-sukisu-version-dropdown.md).
+The [Manager UAPI repair](2026-10-17-sukisu-uapi-manager-compatibility.md)
+owns the paired source defaults and rejects auto-mode interface mismatches
+before the numeric version override.
 
 ## Alternatives considered
 
@@ -57,11 +60,12 @@ present, and `git diff --check` reports no whitespace errors. The pinned
 its `kpm/patch_linux` SHA256 is
 `1bd00563e9d8fbbd11a16c0c1c59c5add406e6c5c92557def50f93d6f0aebe2d`.
 
-A full kernel compile cannot be reproduced locally on the Windows host. The
-next Actions run must still prove that the pinned patcher accepts this exact
-6.6.118 Image, emits a different non-empty `oImage`, and passes the embedded
-Image checksum comparison. A fresh phone boot is the final runtime check: the
-manager must show a KPM version and `dmesg` must not report
+[Run 38944690920](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38944690920)
+compiles the repaired builtin/SUSFS pair and patches the 38,529,536-byte raw
+Image into a 38,711,360-byte final Image. Final checksum verification and the
+embedded Image comparison pass. The downloaded AnyKernel3 Image also matches
+the standalone Image byte-for-byte. A fresh phone boot remains the runtime
+check: the manager must show a KPM version and `dmesg` must not report
 `Stub function called (sukisu_kpm_version)`.
 
 ## Consequences
