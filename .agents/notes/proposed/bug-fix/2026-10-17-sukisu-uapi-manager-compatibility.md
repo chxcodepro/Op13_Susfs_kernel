@@ -20,6 +20,20 @@ flag/parameter implementation, then declare 5. Keep the Android 15 / 6.6.118
 kernel base unchanged and pair the new driver with CCTV18 SUSFS 3f6aae5
 (v2.3.0), which calls the now-available ksu_install_su_fd().
 
+The UAPI 3 audit follows upstream commit 86e9b3b: scoped descriptor context,
+restricted ioctl permissions, profile-aware wrapper credential override, and
+post-exec descriptor installation are present. The wrapper does not need to
+call ksu_is_su_session_fd(); that permission check belongs to the dispatcher.
+The LSM header change in that commit is formatting only. CCTV18's exec hook
+installs the descriptor only for a successful su session after profile setup.
+UAPI 4 follows dda78702 and UAPI 5 follows 7ef2dbb7.
+
+The first repair build, 38942212803, exposes two additional builtin compile
+defects: the manager ioctl is used but not declared, and the dynamic-manager
+scan references an out-of-scope pkg variable. Add the release's exact manager
+ioctl definition and skip KSU_PACKAGE_NAME in that scan, retaining signature
+verification and builtin-manager priority.
+
 Before building in auto mode, compare the actual driver's UAPI with the
 official Manager release source. Fail on mismatches instead of disguising an
 old interface with a new numeric driver version. Preserve explicit legacy
