@@ -990,6 +990,11 @@ jobs:
           VERIFIED_SUSFS="3f6aae536724af0df3dfa15f932034d14a5dbc5c"
           got_suki="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/KernelSU" rev-parse HEAD 2>/dev/null || echo unknown)"
           got_susfs="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/susfs4ksu" rev-parse HEAD 2>/dev/null || echo unknown)"
+          if [ "$got_suki" = "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26" ] && [ "$got_susfs" = "$VERIFIED_SUSFS" ]; then
+            helpers="$GITHUB_WORKSPACE/.github/patches/sukisu-selinux-query-helpers.patch"
+            patch --dry-run -p1 --fuzz=0 < "$helpers"
+            patch -p1 --fuzz=0 < "$helpers" | tee "$GITHUB_WORKSPACE/_ox_debug/selinux-query-helpers.log"
+          fi
           mode="${OX_SELINUX_HIDE_HOOKS:-auto}"
           hooks_on=0
           case "$mode" in

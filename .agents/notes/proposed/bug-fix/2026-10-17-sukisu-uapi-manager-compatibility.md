@@ -43,6 +43,14 @@ static-branch toggling invalid; compilation alone does not establish this ABI.
 The build inspects the linked vmlinux symbol and rejects a missing or one-byte
 switch for this pinned driver, retaining the result in the debug artifact.
 
+Run 38943053604 reaches final link but finds an undefined
+context_struct_compute_av_fn in the driver's policy-query code. For this exact
+driver/SUSFS pair, add two thin ss/services.c wrappers around the kernel's own
+context/access-vector and masked-permission audit helpers. This binds the
+driver to this kernel's real policy implementation without weak-symbol stubs,
+duplicating the policy algorithm, or enabling the guarded hooks.c/selinuxfs.c
+hiding replacements. The latter guard and its limitation remain unchanged.
+
 Before building in auto mode, compare the actual driver's UAPI with the
 official Manager release source. Fail on mismatches instead of disguising an
 old interface with a new numeric driver version. Preserve explicit legacy
