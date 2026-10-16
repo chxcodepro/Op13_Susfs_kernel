@@ -4,9 +4,9 @@ Status: implemented
 
 ## Problem
 
-The dispatch form lists only `auto`, `40900`, and `40796` while the official
-Manager has reached `40994`. Runtime auto-resolution works, but users cannot
-see the latest numeric choice before starting a build.
+The dispatch form previously listed only `auto`, `40900`, and `40796` while the
+official Manager had reached `40994`. Runtime auto-resolution worked, but users
+could not see the latest numeric choice before starting a build.
 
 ## Decision
 
@@ -56,5 +56,12 @@ runs, Action outputs, and failure paths. A live `--check` resolves `40994` and
 finds the dropdown current. Both affected workflows pass actionlint and YAML
 structure checks; changed shell blocks pass `bash -n`, and executing the summary
 block includes the resolved version, release, and source ref. Note format and
-relative-link checks pass. Publishing and the actual GitHub dropdown await the
-repository secret and a pushed workflow.
+relative-link checks pass.
+
+The initial [remote sync](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38929281932)
+passes all 12 cases and creates automatic commit `d7d25b4`, adding `40994` to the
+default-branch workflow. The published choices are `auto`, `40994`, `40900`, and
+`40796`. The [generated-commit lint](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38929304606)
+passes. A [second sync](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38929512183)
+reports the dropdown current and creates no commit, verifying the no-change
+publication path with the configured credential. No kernel build is dispatched.
