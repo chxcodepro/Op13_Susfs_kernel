@@ -36,11 +36,12 @@ on:
         type: string
         default: "f2201c472b607557ed8563e2d1b729af25f3111b"
       sukisu_driver_version:
-        description: "Choose auto (recommended) to read the versionCode from the latest official SukiSU Ultra Manager release, or select a known compatibility version."
+        description: "auto = latest official stable at build time; latest synced: 40994. Source ref is separate."
         required: true
         type: choice
         options:
           - auto
+          - "40994"
           - "40900"
           - "40796"
         default: "auto"
