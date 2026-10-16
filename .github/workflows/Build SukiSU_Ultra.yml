@@ -15,7 +15,7 @@ env:
   # v111 pins (reproducible build).
   CCTV18_ASSETS_REF: "21db9e7d547ca625bd5aa734fb5dfc8b94ea48ef"
   CCTV18_KERNEL_COMMIT: "2a4726b11594dd57d0779d2685fad5c81e5ed553"
-  SUKISU_SETUP_REF: "f2201c472b607557ed8563e2d1b729af25f3111b"
+  SUKISU_SETUP_REF: "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26"
   SUKISU_KPM_PATCH_REF: "547ae94bcaec53d030398f857950c64662043a5d"
   SUKISU_KPM_PATCH_SHA256: "1bd00563e9d8fbbd11a16c0c1c59c5add406e6c5c92557def50f93d6f0aebe2d"
   AK3_REF: "020dfeccf9d7e962a48400fc94d3e451df92eead"
@@ -31,12 +31,12 @@ on:
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       sukisu_ref:
-        description: "SukiSU Ultra 源码分支或提交，必须与 susfs_ref 配套。默认 f2201c4 为已通过编译验证的 builtin/no_su 版本，搭配 SUSFS 40e6c19；e2912817 曾因缺少 kernel_umount_feature_set 编译失败。管理器/驱动版本由 sukisu_driver_version 单独选择：auto 获取官方最新稳定版，40900 保留已验证的 v4.2.0 配对。使用 v4.1.3/40796 时须改用旧配对：SukiSU 6c13a0695a1115e1000c998872b66f4ff5b2f11e + SUSFS 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a。"
+        description: "SukiSU Ultra 源码分支或提交，必须与 susfs_ref 配套。默认使用 builtin 0af2cf9 及完整 UAPI 5 兼容补丁，搭配 SUSFS 3f6aae5。auto 会校验所选驱动与官方管理器的接口；手动版本号不会自动切换源码或保证接口匹配。旧版 v4.1.3/40796 配对保留为：SukiSU 6c13a0695a1115e1000c998872b66f4ff5b2f11e + SUSFS 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a。"
         required: true
         type: string
-        default: "f2201c472b607557ed8563e2d1b729af25f3111b"
+        default: "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26"
       sukisu_driver_version:
-        description: "auto：构建时获取官方最新稳定版；当前已同步：40994。源码提交单独选择。"
+        description: "auto：构建时获取官方最新稳定版并校验驱动接口；当前已同步：40994。源码提交单独选择。"
         required: true
         type: choice
         options:
@@ -62,10 +62,10 @@ on:
         options: ["On", "Off"]
         default: "On"
       susfs_ref:
-        description: "CCTV18 susfs4oki 提交，必须与 sukisu_ref 同代。v111 固定使用已通过编译并含 no_su 钩子修复的配对：SukiSU f2201c4 + SUSFS 40e6c19（v2.2.0）。不要直接改成 v2.3.0（383616f）：其 fs/exec.c 调用 ksu_install_su_fd()，而 f2201c4 未实现，会链接失败；e2912817 曾因缺少 kernel_umount_feature_set 编译失败。ReSukiSU 实现了 ksu_install_su_fd()，可使用 v2.3.0。源码错配会跳过所有应用和 shell 的 su 重定向。"
+        description: "CCTV18 susfs4oki 提交，必须与 sukisu_ref 配套。默认 3f6aae5（v2.3.0），搭配已提供 ksu_install_su_fd() 的 builtin 0af2cf9。旧 f2201c4 仅配 40e6c19（v2.2.0），不能直接使用 v2.3.0；源码错配可能链接失败或跳过应用和 shell 的 su 重定向。"
         required: true
         type: string
-        default: "40e6c19ec2ca88804d6c2e3ddf52623af6685463"
+        default: "3f6aae536724af0df3dfa15f932034d14a5dbc5c"
       susfs_patch_policy:
         description: "补丁失败策略：strict 遇到拒绝即失败；audited_cctv18 仅容许已知的 task_mmu 拒绝；native_cctv18 按 CCTV18 方式记录并继续。"
         required: true
@@ -460,6 +460,22 @@ jobs:
           else
             echo "==> Skipping apk_sign.patch (SukiSU has native manager signing; set OX_TRY_APK_SIGN=1 to attempt)."
           fi
+      - name: "Prepare SukiSU builtin UAPI compatibility"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s .github/scripts -p 'test_verify_sukisu_uapi.py' -v
+          source_dir="$GITHUB_WORKSPACE/kernel_workspace/KernelSU"
+          actual_ref="$(git -C "$source_dir" rev-parse HEAD)"
+          if [ "$actual_ref" = "0af2cf9cef7dc2239fa7ebb3f7898830a1087e26" ]; then
+            patch_file="$GITHUB_WORKSPACE/.github/patches/sukisu-builtin-uapi5.patch"
+            git -C "$source_dir" apply --check "$patch_file"
+            git -C "$source_dir" apply "$patch_file"
+            echo "Applied builtin UAPI 5 compatibility to $actual_ref"
+          else
+            echo "Custom source ref: no pinned builtin compatibility patch applied."
+          fi
+
       - name: "Resolve SukiSU driver version (release auto/manual)"
         id: sukisu_version
         shell: bash
@@ -592,6 +608,15 @@ jobs:
             exit 1
           fi
 
+          python3 "$GITHUB_WORKSPACE/.github/scripts/verify_sukisu_uapi.py" \
+            --kernel-dir "$GITHUB_WORKSPACE/kernel_workspace/common/drivers/kernelsu" \
+            --manager-tag "$release_tag" \
+            | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json"
+          kernel_uapi="$(jq -r '.kernel_uapi // "legacy"' "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json")"
+          manager_uapi="$(jq -r '.manager_uapi // "manual-unchecked"' "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json")"
+          echo "SUKISU_KERNEL_UAPI=$kernel_uapi" >> "$GITHUB_ENV"
+          echo "SUKISU_MANAGER_UAPI=$manager_uapi" >> "$GITHUB_ENV"
+
           # Override only KSU_VERSION immediately before KSU_VERSION_FULL is evaluated.
           # Do not alter the selected source ref or its UAPI; this only fixes the numeric
           # driver version exposed to the Manager.
@@ -653,6 +678,7 @@ jobs:
             printf -- '- Reported driver version: `%s`\n' "$driver_version"
             printf -- '- Version source: %s\n' "$version_source"
             printf -- '- SukiSU source commit/ref: `%s`\n' "$actual_ref"
+            printf -- '- Driver UAPI: `%s`; Manager UAPI: `%s`\n' "$kernel_uapi" "$manager_uapi"
             echo '- Version selection does not update the SukiSU/SUSFS source refs.'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -1794,6 +1820,8 @@ jobs:
           SukiSU driver version input: ${{ inputs.sukisu_driver_version }}
           SukiSU driver version mode: ${{ steps.sukisu_version.outputs.mode }}
           SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}
+          SukiSU kernel UAPI: ${SUKISU_KERNEL_UAPI:-unknown}
+          SukiSU Manager UAPI: ${SUKISU_MANAGER_UAPI:-unknown}
           KPM final Image status: ${KPM_PATCH_STATUS:-unknown}
           KPM patch source: SukiSU-Ultra/SukiSU_patch @ ${SUKISU_KPM_PATCH_REF}
           SUSFS: cctv18/susfs4oki only, ref=${{ inputs.susfs_ref }}

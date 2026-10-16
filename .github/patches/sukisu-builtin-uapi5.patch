@@ -1,0 +1,82 @@
+diff --git a/kernel/include/ksu.h b/kernel/include/ksu.h
+index 1d6eddd8..4e73b285 100644
+--- a/kernel/include/ksu.h
++++ b/kernel/include/ksu.h
+@@ -9,6 +9,9 @@
+ 
+ extern struct cred *ksu_cred;
+ extern bool allow_shell;
++#ifdef MODULE
++extern bool ksu_bundled;
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ extern struct selinux_policy *backup_sepolicy;
+ #endif
+diff --git a/kernel/include/uapi/supercall.h b/kernel/include/uapi/supercall.h
+index e9e6de82..fb004875 100644
+--- a/kernel/include/uapi/supercall.h
++++ b/kernel/include/uapi/supercall.h
+@@ -14,7 +14,10 @@
+ #endif
+ 
+ // 2: allowlist v4 root profile flag
+-DECLARE(__u32, KERNEL_SU_UAPI_VERSION, 2);
++// 3: scoped su-session driver fd
++// 4: add KSU_GET_INFO_FLAG_BUNDLED
++// 5: add EVENT_SERVICES with a start/skip result
++DECLARE(__u32, KERNEL_SU_UAPI_VERSION, 5);
+ 
+ /* Magic numbers for reboot hook to install fd */
+ DECLARE(__u32, KSU_INSTALL_MAGIC1, 0xDEADBEEF);
+@@ -34,6 +37,7 @@ DECLARE(__u32, KSU_GET_INFO_FLAG_LKM, (1U << 0));
+ DECLARE(__u32, KSU_GET_INFO_FLAG_MANAGER, (1U << 1));
+ DECLARE(__u32, KSU_GET_INFO_FLAG_LATE_LOAD, (1U << 2));
+ DECLARE(__u32, KSU_GET_INFO_FLAG_PR_BUILD, (1U << 3));
++DECLARE(__u32, KSU_GET_INFO_FLAG_BUNDLED, (1U << 4));
+ 
+ struct ksu_get_info_cmd {
+     __u32 version; /* Output: KERNEL_SU_VERSION */
+diff --git a/kernel/ksu.c b/kernel/ksu.c
+index e7e6722a..77069cf4 100644
+--- a/kernel/ksu.c
++++ b/kernel/ksu.c
+@@ -110,6 +110,11 @@ module_param(allow_shell, bool, 0);
+ bool ksu_no_custom_rc = false;
+ module_param_named(norc, ksu_no_custom_rc, bool, 0);
+ 
++#ifdef MODULE
++bool ksu_bundled = false;
++module_param_named(bundled, ksu_bundled, bool, 0);
++#endif
++
+ int __init kernelsu_init(void)
+ {
+ #ifdef CONFIG_KSU_DEBUG
+diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
+index 36f603cb..d85167af 100644
+--- a/kernel/supercall/dispatch.c
++++ b/kernel/supercall/dispatch.c
+@@ -17,6 +17,13 @@ static int do_get_info(void __user *arg)
+ {
+     struct ksu_get_info_cmd cmd = { .version = KERNEL_SU_VERSION, .flags = 0 };
+ 
++#ifdef MODULE
++    cmd.flags |= KSU_GET_INFO_FLAG_LKM;
++    if (ksu_bundled) {
++        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
++    }
++#endif
++
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+@@ -38,6 +45,9 @@ static int do_get_info_legacy(void __user *arg)
+ 
+ #ifdef MODULE
+     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
++    if (ksu_bundled) {
++        cmd.flags |= KSU_GET_INFO_FLAG_BUNDLED;
++    }
+ #endif
+ 
+     if (is_manager()) {
