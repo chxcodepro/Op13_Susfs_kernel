@@ -60,12 +60,12 @@ def update_choices(source, version):
     if not re.search(r"(?m)^        type: choice$", block):
         raise ValueError("sukisu_driver_version is not a choice input")
     description = (
-        "auto = latest official stable at build time; "
-        f"latest synced: {version}. Source ref is separate."
+        "auto：构建时获取官方最新稳定版；"
+        f"当前已同步：{version}。源码提交单独选择。"
     )
     block, descriptions = re.subn(
         r"(?m)^        description: [^\n]*$",
-        lambda _: "        description: " + json.dumps(description),
+        lambda _: "        description: " + json.dumps(description, ensure_ascii=False),
         block,
     )
     versions = dict.fromkeys((version, *COMPATIBILITY_VERSIONS))

@@ -17,6 +17,15 @@ updates only the SukiSU version input's description and choices, preserving
 `40796`. A newer stable replaces the previous automatically tracked choice.
 No release change means no commit. API or schema failures leave the file alone.
 
+All three build dispatch forms use Chinese descriptions while preserving input
+keys, choice values, source pins, and feature defaults. The generated version
+description also stays in Chinese, with literal UTF-8 text in YAML, so daily
+synchronization does not restore English copy. Their `kernel_suffix` defaults
+match the supplied PJZ110_17.0.0.103 screenshot:
+`android15-8-g9bc34d5b0c79-abogki537459655-4k`; the unused `SUB_VERSION` metadata
+is aligned to `118`. The kernel remains on the Android 15 GKI / 6.6.118 source
+baseline; matching the version identifier does not establish firmware support.
+
 The job checks out the default branch and pushes normally, never force-pushing.
 Workflow-file writes require `SUKISU_VERSION_SYNC_TOKEN`, a repository-limited
 token with Contents and Workflows write access; `GITHUB_TOKEN` is insufficient.
@@ -57,6 +66,13 @@ finds the dropdown current. Both affected workflows pass actionlint and YAML
 structure checks; changed shell blocks pass `bash -n`, and executing the summary
 block includes the resolved version, release, and source ref. Note format and
 relative-link checks pass.
+
+Dispatch validation covers all 74 Chinese descriptions across the three build
+forms and the screenshot-matching default version string. Structural comparison
+allows only description edits, the `kernel_suffix` default, and `SUB_VERSION`
+metadata; all source pins, machine-readable options, feature defaults, and build
+steps remain unchanged. The localized generator passes its focused tests and a
+live no-change check; all three changed workflows pass actionlint.
 
 The initial [remote sync](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/38929281932)
 passes all 12 cases and creates automatic commit `d7d25b4`, adding `40994` to the

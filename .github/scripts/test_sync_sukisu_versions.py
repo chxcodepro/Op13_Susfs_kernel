@@ -47,7 +47,8 @@ class DropdownTests(unittest.TestCase):
         self.assertIn('          - "40900"', updated)
         self.assertIn('          - "40796"', updated)
         self.assertIn('        default: "auto"', updated)
-        self.assertIn("latest synced: 41050", updated)
+        self.assertIn("当前已同步：41050", updated)
+        self.assertNotIn("latest synced:", updated)
         self.assertEqual(sync.update_choices(updated, "41050"), updated)
 
     def test_next_release_replaces_previous_latest(self):

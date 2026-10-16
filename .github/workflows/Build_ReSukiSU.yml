@@ -4,7 +4,7 @@ env:
   TZ: Asia/Shanghai
   ANDROID_VERSION: android15
   KERNEL_VERSION: "6.6"
-  SUB_VERSION: "89"
+  SUB_VERSION: "118"
   DEVICE_NAME: OP13
   DEVICE_CODENAME: sun
   CCTV18_BUILD_REPO: cctv18/oppo_oplus_realme_sm8750
@@ -28,136 +28,136 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: "Build profile. stock_daily is recommended for stable daily-driver use."
+        description: "构建预设。日常稳定使用推荐 stock_daily。"
         required: true
         type: choice
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       resukisu_ref:
-        description: "BakaSU ref (Baka-SU/BakaSU; ReSukiSU was renamed BakaSU, same manager package com.resukisu.resukisu and signing key). MUST BE PAIRED WITH susfs_ref (no_su generation: driver susfs_set_current_proc_no_su + SUSFS at/after 525c450). v109 DEFAULT d7260ca = BakaSU main 2026-10-14. BakaSU main deliberately stops SUSFS builds (kernel/tools/susfs_compat.mk, commit 48fa4bb) because SUSFS SELinux-hide hooks lack KernelSU #3877 (timing side-channel fix). v109 handles that in Apply SUSFS: SUSFS's SELinux-hide sections are not applied, so BakaSU's own up-to-date selinux_hide is used, and only then is the gate lifted. Verified: SUSFS-touched objects + full driver compile, all cross-symbols resolve. Previous known-good: 23a40c0 + susfs 383616f (v108)."
+        description: "BakaSU 源码分支或提交（Baka-SU/BakaSU；ReSukiSU 已更名，管理器包名 com.resukisu.resukisu 和签名密钥不变）。必须与 susfs_ref 配套：no_su 版本要求驱动提供 susfs_set_current_proc_no_su，SUSFS 包含 525c450 或后续提交。v109 默认 d7260ca 为 2026-10-14 的 BakaSU main。48fa4bb 通过 kernel/tools/susfs_compat.mk 阻止 SUSFS 构建，原因是其 SELinux 隐藏钩子缺少 KernelSU #3877 时序侧信道修复。本流程不应用这部分 SUSFS 补丁，改用 BakaSU 自身的 selinux_hide 后才解除限制；已验证相关对象和完整驱动编译及跨模块符号解析。此前已知可用配对：23a40c0 + SUSFS 383616f（v108）。"
         required: true
         type: string
         default: "d7260ca1e5c128061122924d0d48754e361e135c"
       kpm_enable:
-        description: "Enable KPM (KernelPatch Module) support. DEFAULT OFF for ReSukiSU: this root has NO kernel-side KPM implementation (KPM exists only as a deprecated manager/uapi enum, verified at the pinned commit), so enabling it cannot produce CONFIG_KPM=y and only emits a harmless 'KPM requested but not present' warning. KPM is a SukiSU-Ultra feature; leave this Off on ReSukiSU."
+        description: "KPM（KernelPatch Module）支持，ReSukiSU 默认关闭。已核对的固定提交没有内核端 KPM 实现，仅保留弃用的管理器/UAPI 枚举；勾选也不会生成 CONFIG_KPM=y，只会提示已请求但不存在 KPM。KPM 是 SukiSU Ultra 的功能，此流程请保持关闭。"
         required: true
         type: boolean
         default: false
       multi_manager_support:
-        description: "Enable ReSukiSU multi-manager support if the selected ref exposes it."
+        description: "所选 ReSukiSU 源码支持时，启用多管理器支持。"
         required: true
         type: boolean
         default: true
       SUSFS:
-        description: "Enable CCTV18 susfs4oki only. No WildKernels/TheWildJames SUSFS tree."
+        description: "仅启用 CCTV18 susfs4oki，不混用 WildKernels/TheWildJames 的 SUSFS 源码。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       susfs_ref:
-        description: "CCTV18 susfs4oki ref (oki-android15-6.6). v109 DEFAULT 3f6aae5 = SUSFS v2.3.0, latest CCTV18 (2026-10-15, synced to KernelSU 0a1f3ff). All SUSFS features are kept (sus_path, sus_mount, sus_kstat, sus_map, uname/cmdline spoof, open_redirect, kallsyms hiding, AVC log spoof); only its SELinux-hide sections (security/selinux/hooks.c, selinuxfs.c, ss/services.c) are left to BakaSU, see OX_BAKASU_SELINUX_HIDE_OWNER. Contains 525c450 (no_su guard). Previous pin 383616f (v108, with resukisu 23a40c0). MUST MATCH the driver generation; a mismatch makes the kernel skip the su redirect for every app and shell."
+        description: "CCTV18 susfs4oki 提交（oki-android15-6.6）。v109 默认 3f6aae5 为 2026-10-15 的 SUSFS v2.3.0，已同步 KernelSU 0a1f3ff，包含 525c450 的 no_su 保护。保留 sus_path、sus_mount、sus_kstat、sus_map、uname/cmdline 伪装、open_redirect、kallsyms 隐藏和 AVC 日志伪装；仅将 security/selinux/hooks.c、selinuxfs.c、ss/services.c 的 SELinux 隐藏交给 BakaSU，见 OX_BAKASU_SELINUX_HIDE_OWNER。此前固定版本为 383616f，搭配 ReSukiSU 23a40c0（v108）。必须与驱动同代，否则会跳过所有应用和 shell 的 su 重定向。"
         required: true
         type: string
         default: "3f6aae536724af0df3dfa15f932034d14a5dbc5c"
       susfs_patch_policy:
-        description: "strict = fail on reject; audited_cctv18 = allow known task_mmu reject only; native_cctv18 = CCTV18-style continue/audit."
+        description: "补丁失败策略：strict 遇到拒绝即失败；audited_cctv18 仅容许已知的 task_mmu 拒绝；native_cctv18 按 CCTV18 方式记录并继续。"
         required: true
         type: choice
         options: [audited_cctv18, strict, native_cctv18]
         default: audited_cctv18
       hook_mode:
-        description: "Hook source. inline_susfs uses the SUSFS-inlined hooks (the supported target for these refs)."
+        description: "钩子来源。inline_susfs 使用 SUSFS 内联钩子，是当前固定源码配对支持的模式。"
         required: true
         type: choice
         options: [inline_susfs, resukisu_auto, tracepoint_test]
         default: inline_susfs
       kernel_suffix:
-        description: "Stock-like LOCALVERSION without leading dash (this is the real uname -r). Leave default for current OP13 stock mimic / best app compatibility."
+        description: "内核版本后缀（LOCALVERSION），不要填写开头的横线。默认与 PJZ110_17.0.0.103 截图一致；对齐版本标识不等于完成固件适配。"
         required: false
         type: string
-        default: "android15-8-g93e223c276e7-abogki500782043-4k"
+        default: "android15-8-g9bc34d5b0c79-abogki537459655-4k"
       kernel_name:
-        description: "Display name shown in kernel-manager apps and the flash banner (does NOT change uname -r). Customise this freely, e.g. 'OX13-ReSukiSU'."
+        description: "内核管理器和刷机横幅中的显示名称，不改变 uname -r。可自行修改，例如 OX13-ReSukiSU。"
         required: false
         type: string
         default: "PJZ110 | BakaSU [Inline StockLike] + CCTV18 SUSFS (OP-OX)"
       optimise:
-        description: "O2 is stable daily-driver default. O3 is test-only."
+        description: "优化级别：日常稳定使用默认 O2；O3 仅用于测试。"
         required: true
         type: choice
         options: [O2, O3]
         default: O2
       lz4_zram_patch:
-        description: "Apply CCTV18 LZ4/ZSTD/ZRAM patch group. DEFAULT OFF: these patches modify kernel HEADERS (include/linux/lz4.h etc.), a GKI 2.0 KMI risk, and do not apply cleanly to this source. The kernel already builds ZRAM with lz4+zstd from the stock config, so leaving this Off changes nothing at runtime and removes 3 skip-warnings per build. Only set On if you have verified the patch group applies to your exact source."
+        description: "CCTV18 LZ4/ZSTD/ZRAM 补丁组，默认 Off。补丁会修改 include/linux/lz4.h 等内核头文件，存在 GKI 2.0 KMI 风险，且不能干净应用到当前源码。原配置已包含 ZRAM、lz4 和 zstd，保持 Off 不改变这些运行时功能，并避免每次构建的 3 条跳过警告。仅在确认补丁与所选源码匹配后开启。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "Off"
       zram_module:
-        description: "Enable kernel ZRAM + LZ4/LZ4HC/ZSTD support in config (recommended). Runtime ZRAM tuning (LZ4 / enable-disable) is handled by the X1 Kernel Manager module."
+        description: "启用内核 ZRAM 及 LZ4/LZ4HC/ZSTD 配置（推荐）。运行时压缩算法与启停调优由 X1 Kernel Manager 模块处理。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       bbg:
-        description: "Enable Baseband Guard if CCTV18 patch exists and applies cleanly."
+        description: "CCTV18 补丁存在且能干净应用时，启用 Baseband Guard（基带保护）。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       bbr:
-        description: "Compile in TCP BBR (selectable at runtime, not forced as system default). On is a safe daily-driver throughput option."
+        description: "将 TCP BBR 编译入内核，运行时可选，不强制设为系统默认。日常使用建议 On。"
         required: true
         type: choice
         options: ["Off", "On", "Default"]
         default: "On"
       adios:
-        description: "Enable ADIOS I/O scheduler if CCTV18 patch exists and applies cleanly."
+        description: "CCTV18 补丁存在且能干净应用时，启用 ADIOS I/O 调度器。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       rekernel:
-        description: "Enable Re:Kernel (best-effort: applied only if the CCTV18 patch dry-runs cleanly, else skipped)."
+        description: "启用 Re:Kernel；仅在 CCTV18 补丁预检查通过时应用，否则跳过。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       proxy:
-        description: "Enable better net/TTL/IP_SET style options."
+        description: "启用增强网络、TTL 和 IP_SET 相关配置。"
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       fengchi:
-        description: "Experimental FengChi/HMBIRD scheduler patch if present. Off by default for stability/battery."
+        description: "存在时应用实验性的风驰/HMBIRD 调度器补丁；为稳定性和续航考虑，默认 Off。"
         required: true
         type: choice
         options: ["Off", "On"]
         default: "Off"
       zram_comp:
-        description: "Preferred ZRAM compressor where supported."
+        description: "内核支持时优先使用的 ZRAM 压缩算法。"
         required: true
         type: choice
         options: [lz4, lzo-rle, zstd]
         default: lz4
       clean_ccache:
-        description: "Delete ccache before building. Use only when testing cache issues."
+        description: "构建前删除 ccache 缓存，仅在排查缓存问题时启用。"
         required: true
         type: boolean
         default: false
       BUILD_TIME:
-        description: "Custom build time string. Enter F to use current UTC."
+        description: "自定义编译时间；填写 F 使用当前 UTC 时间。"
         required: false
         type: string
         default: "F"
       BUILD_USER:
-        description: "KBUILD_BUILD_USER"
+        description: "编译者名称（KBUILD_BUILD_USER）。"
         required: false
         type: string
         default: "ox1d3x3"
       BUILD_HOST:
-        description: "KBUILD_BUILD_HOST"
+        description: "编译主机名称（KBUILD_BUILD_HOST）。"
         required: false
         type: string
         default: "op13-cctv18-resukisu"

@@ -4,7 +4,7 @@ env:
   TZ: Asia/Shanghai
   ANDROID_VERSION: android15
   KERNEL_VERSION: "6.6"
-  SUB_VERSION: "89"
+  SUB_VERSION: "118"
   DEVICE_NAME: OP13
   DEVICE_CODENAME: sun
   # ---- SUSFS source (v94) ----
@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: "Daily-driver profile. stock_daily is the recommended default."
+        description: "日常使用的构建预设，推荐默认 stock_daily。"
         required: true
         type: choice
         options:
@@ -43,22 +43,22 @@ on:
           - debug_only
         default: stock_daily
       ksun_ref:
-        description: "KernelSU-Next ref. For clean CCTV18 KSUN lane keep dev-susfs unless you are testing a known-good commit."
+        description: "KernelSU-Next 源码分支或提交。CCTV18 KSUN 流程建议保持 dev-susfs，仅在测试已知可用提交时修改。"
         required: true
         type: string
         default: "dev-susfs"
       susfs_enable:
-        description: "Enable CCTV18 susfs4oki only. No WildKernels/TheWildJames SUSFS patch tree is used."
+        description: "仅启用 CCTV18 susfs4oki，不混用 WildKernels/TheWildJames 的 SUSFS 补丁。"
         required: true
         type: boolean
         default: true
       susfs_ref:
-        description: "CCTV18 susfs4oki branch/ref. OP13 Android 15/16 6.6 should use oki-android15-6.6."
+        description: "CCTV18 susfs4oki 分支或提交；OP13 的 Android 15/16、6.6 内核应使用 oki-android15-6.6。"
         required: true
         type: string
         default: "oki-android15-6.6"
       susfs_patch_policy:
-        description: "strict fails on any reject; audited_cctv18 allows only the known task_mmu reject; native_cctv18 audits but continues like CCTV18."
+        description: "补丁失败策略：strict 遇到任何拒绝即失败；audited_cctv18 仅容许已知的 task_mmu 拒绝；native_cctv18 按 CCTV18 方式记录并继续。"
         required: true
         type: choice
         options:
@@ -67,7 +67,7 @@ on:
           - native_cctv18
         default: audited_cctv18
       hook_mode:
-        description: "KernelSU hook/audit mode. cctv18_susfs_auto is recommended for clean KSUN dev-susfs; strict_none_hook_test only passes if the KSUN tree exposes CONFIG_KSU_NONE_HOOK."
+        description: "KernelSU 钩子/审计模式。KSUN dev-susfs 推荐 cctv18_susfs_auto；strict_none_hook_test 仅在源码提供 CONFIG_KSU_NONE_HOOK 时通过。"
         required: true
         type: choice
         options:
@@ -76,27 +76,27 @@ on:
           - strict_none_hook_test
         default: cctv18_susfs_auto
       cctv18_kernel_ref:
-        description: "CCTV18 OP13 6.6.118 source branch/ref (update this when a new OTA bumps the kernel)."
+        description: "CCTV18 OP13 6.6.118 内核源码分支或提交；新 OTA 升级内核版本时需同步更新。"
         required: true
         type: string
         default: "oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118"
       kernel_suffix:
-        description: "Stock-like LOCALVERSION without leading dash (this is the real uname -r). Leave default for current OP13 stock mimic / best app compatibility."
+        description: "内核版本后缀（LOCALVERSION），不要填写开头的横线。默认与 PJZ110_17.0.0.103 截图一致；对齐版本标识不等于完成固件适配。"
         required: true
         type: string
-        default: "android15-8-g93e223c276e7-abogki500782043-4k"
+        default: "android15-8-g9bc34d5b0c79-abogki537459655-4k"
       kernel_name:
-        description: "Display name shown in kernel-manager apps and the flash banner (does NOT change uname -r). Customise this freely, e.g. 'OX13-KSUN'."
+        description: "内核管理器和刷机横幅中的显示名称，不改变 uname -r。可自行修改，例如 OX13-KSUN。"
         required: false
         type: string
         default: "PJZ110 | KernelSU-Next [StockLike] + CCTV18 SUSFS (OP-OX)"
       stock_mimic:
-        description: "Keep uname -r stock-like by using only the supplied kernel_suffix as LOCALVERSION."
+        description: "仅使用填写的 kernel_suffix 作为 LOCALVERSION，使 uname -r 保持原厂风格。"
         required: true
         type: boolean
         default: true
       optimise:
-        description: "O2 is the stable daily-driver default. O3 is test-only."
+        description: "优化级别：日常稳定使用默认 O2；O3 仅用于测试。"
         required: true
         type: choice
         options:
@@ -104,22 +104,22 @@ on:
           - O3
         default: O2
       adios:
-        description: "Apply CCTV18 ADIOS scheduler patch if it exists and dry-run applies cleanly."
+        description: "CCTV18 ADIOS 调度器补丁存在且预检查通过时应用。"
         required: true
         type: boolean
         default: true
       baseband_guard:
-        description: "Apply CCTV18 Baseband Guard patch if it exists and dry-run applies cleanly."
+        description: "CCTV18 Baseband Guard（基带保护）补丁存在且预检查通过时应用。"
         required: true
         type: boolean
         default: true
       better_net:
-        description: "Enable netfilter/ipset/TTL support for useful advanced networking without making BBR default."
+        description: "启用 netfilter/ipset/TTL 高级网络支持，不将 BBR 设为默认。"
         required: true
         type: boolean
         default: true
       bbr_mode:
-        description: "enabled compiles TCP BBR in (selectable at runtime, not forced default). Recommended for daily use."
+        description: "enabled 将 TCP BBR 编译入内核，运行时可选，不强制设为默认；日常使用推荐此选项。"
         required: true
         type: choice
         options:
@@ -128,12 +128,12 @@ on:
           - default
         default: enabled
       zram_lz4:
-        description: "Enable kernel ZRAM + LZ4/LZ4HC/ZSTD support in config. This is config-only, not a random patch mix."
+        description: "启用内核 ZRAM 及 LZ4/LZ4HC/ZSTD 支持；仅修改配置，不混用额外补丁。"
         required: true
         type: boolean
         default: true
       zram_comp:
-        description: "Preferred ZRAM default compressor when kernel config supports CONFIG_ZRAM_DEF_COMP."
+        description: "内核支持 CONFIG_ZRAM_DEF_COMP 时优先使用的 ZRAM 默认压缩算法。"
         required: true
         type: choice
         options:
@@ -142,42 +142,42 @@ on:
           - zstd
         default: lz4
       ntsync:
-        description: "Enable NTSYNC config if available."
+        description: "内核提供该选项时，启用 NTSYNC 配置。"
         required: true
         type: boolean
         default: true
       unicode_fix:
-        description: "Apply CCTV18 Unicode-related patch if present and dry-run applies cleanly."
+        description: "CCTV18 Unicode 相关补丁存在且预检查通过时应用。"
         required: true
         type: boolean
         default: true
       droidspaces:
-        description: "Enable Droidspaces/container namespace options. Off is safer for normal phone use."
+        description: "启用 Droidspaces/容器命名空间配置；普通手机日常使用建议关闭。"
         required: true
         type: boolean
         default: false
       rekernel:
-        description: "Apply Re:Kernel patch when present (best-effort, dry-run gated; skips if it does not apply cleanly)."
+        description: "Re:Kernel 补丁存在且预检查通过时应用，无法干净应用时跳过。"
         required: true
         type: boolean
         default: true
       package_ak3:
-        description: "Create fixed AnyKernel3 flashable ZIP plus raw Image."
+        description: "生成已修正分区检测的 AnyKernel3 刷机 ZIP 和原始 Image。"
         required: true
         type: boolean
         default: true
       clean_ccache:
-        description: "Delete ccache before building. Use only when you suspect cache contamination."
+        description: "构建前删除 ccache 缓存，仅在怀疑缓存污染时启用。"
         required: true
         type: boolean
         default: false
       BUILD_TIME:
-        description: "Custom build time string. Enter F to use current UTC; enter stock timestamp string for stock-like build time."
+        description: "自定义编译时间：填写 F 使用当前 UTC 时间；填写原厂时间字符串可保持原厂风格。"
         required: false
         type: string
         default: "F"
       upload_debug:
-        description: "Always upload logs, final config, rejects, UTS, Image and ZIPs."
+        description: "始终上传日志、最终配置、补丁拒绝文件、UTS、Image 和 ZIP。"
         required: true
         type: boolean
         default: true
