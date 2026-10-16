@@ -646,6 +646,15 @@ jobs:
           echo "release_asset=$release_asset" >> "$GITHUB_OUTPUT"
           echo "==> Resolved SukiSU driver version: $driver_version ($version_source)"
 
+          actual_ref="$(cat "$GITHUB_WORKSPACE/_ox_debug/sukisu_commit.txt" 2>/dev/null || printf '%s' "$selected_ref")"
+          {
+            echo "## SukiSU version selection"
+            printf -- '- Reported driver version: `%s`\n' "$driver_version"
+            printf -- '- Version source: %s\n' "$version_source"
+            printf -- '- SukiSU source commit/ref: `%s`\n' "$actual_ref"
+            echo '- Version selection does not update the SukiSU/SUSFS source refs.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: "SukiSU Ultra compile compatibility repairs"
         shell: bash
         run: |

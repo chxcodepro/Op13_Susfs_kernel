@@ -33,6 +33,9 @@ versionCode; known compatibility values remain selectable fallbacks. The kernel
 source ref stays on the compile-tested default because automatically advancing
 it can cross the SukiSU/SUSFS generation boundary.
 
+Daily dropdown refresh and its workflow-write credential are covered by
+[version synchronization](../process/2026-10-16-sukisu-version-dropdown.md).
+
 ## Alternatives considered
 
 Running the unpinned `patch_linux` from the upstream default branch is the

@@ -92,6 +92,7 @@ Both lanes are **manually triggered** (`workflow_dispatch`) and share:
 |---|---|---|
 | `profile` | `stock_daily` / `stock_plus` / `minimal_safe` / `debug_only` | `stock_daily` |
 | root ref | `sukisu_ref` / `resukisu_ref` | **pinned commits** (see “Why the root refs are pinned”) |
+| `sukisu_driver_version` | Latest official stable Manager versionCode or a compatibility value | `auto` (resolved at build time) |
 | `SUSFS` / `susfs_enable` | Enable CCTV18 SUSFS | On |
 | `susfs_patch_policy` | `strict` / `audited_cctv18` / `native_cctv18` | `audited_cctv18` |
 | `hook_mode` | Hook target (inline SUSFS vs. auto/kprobe) | `inline_susfs` / `cctv18_susfs_auto` |
@@ -103,6 +104,24 @@ Both lanes are **manually triggered** (`workflow_dispatch`) and share:
 | `adios`, `bbg`, `rekernel` | Optional CCTV18 patches (best‑effort, see note) | **On** |
 | `fengchi` / HMBIRD | Experimental scheduler | Off (stability) |
 | `clean_ccache` | Wipe ccache before building | false |
+
+### SukiSU version dropdown
+
+**Sync SukiSU versions** refreshes the dropdown daily at 10:23 Asia/Shanghai
+(GitHub scheduling may be delayed), or when run manually. It keeps `auto`, the
+latest official stable versionCode, `40900`, and `40796`. A changed release
+creates one commit on the default branch; unchanged releases create none.
+
+Set the repository Actions secret `SUKISU_VERSION_SYNC_TOKEN` to a fine-grained
+token limited to this repository with **Contents: read and write** and
+**Workflows: read and write**. The default `GITHUB_TOKEN` cannot update workflow
+files ([permission requirements](https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents)).
+Branch protection must permit the token's owner to push; a rejected push
+fails the sync rather than bypassing protection.
+
+The build summary shows the resolved driver version and the selected source
+commit/ref before compilation. Selecting a version does not upgrade SukiSU or
+SUSFS source refs and does not establish firmware compatibility.
 
 > **Optional patches are best‑effort.** `adios`, `baseband_guard`, `rekernel`,
 > `fengchi`/HMBIRD etc. are applied **only if** a matching CCTV18 patch exists
