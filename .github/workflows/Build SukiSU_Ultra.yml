@@ -12,7 +12,7 @@ env:
   CCTV18_KERNEL_REF: oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118
   CCTV18_TOOLCHAIN_RELEASE: LLVM-Clang18-r510928
   CCACHE_DIR: ${{ github.workspace }}/.ccache_op13_sukisu_cctv18
-  # v112 pins (reproducible build).
+  # v113 pins (reproducible build).
   CCTV18_ASSETS_REF: "21db9e7d547ca625bd5aa734fb5dfc8b94ea48ef"
   CCTV18_KERNEL_COMMIT: "2a4726b11594dd57d0779d2685fad5c81e5ed553"
   SUKISU_SETUP_REF: "2d1de629d4204d25cc0c8927b959d9135d9781f4"
@@ -29,7 +29,7 @@ on:
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       sukisu_ref:
-        description: "SukiSU Ultra ref. MUST BE PAIRED WITH susfs_ref AND with the manager APK. v112 DEFAULT 2d1de62 = builtin branch HEAD (2026-10-12): no_su generation, defines ksu_install_su_fd() and the SUSFS 2.3.x SELinux-hide symbols (backup_sepolicy, fake_status, initialize_fake_status). Builds only with the v112 pkg_observer repair (upstream c895920 references an undefined TRACK_THRONE_FORCE_SYNCHRONOUS; the repair applies official KernelSU's track_throne(false)). Pair with susfs_ref 3f6aae5 (SUSFS v2.3.0) and INSTALL THE v4.2.0 MANAGER APK (SukiSU_v4.2.0_40900_releases.apk). The driver is made to REPORT 40900 (GITHUB_COMMITS=3715); without that the manager shows a permanent version mismatch, rejects App Profile writes and root breaks. Driver<->manager ABI checked vs v4.2.0: same ioctl numbers, identical app_profile struct. Fallback pair if needed: sukisu f2201c472b607557ed8563e2d1b729af25f3111b + susfs 40e6c19ec2ca88804d6c2e3ddf52623af6685463 (v2.2.0)."
+        description: "SukiSU Ultra ref. MUST BE PAIRED WITH susfs_ref AND with the manager APK. v113 DEFAULT 2d1de62 = builtin branch (2026-10-12): no_su generation, defines ksu_install_su_fd(). Builds only with the pkg_observer repair (upstream c895920 uses an undefined TRACK_THRONE_FORCE_SYNCHRONOUS; still unfixed at builtin 0af2cf9c). Pair with susfs_ref 2919a9a. MANAGER: use SukiSU v4.2.0 (SukiSU_v4.2.0_40900_releases.apk). Do NOT install v4.2.1 (40994): it requires kernel UAPI 5 and the builtin branch reports UAPI 2, so v4.2.1 treats root as unavailable. Driver is made to report 40900 (GITHUB_COMMITS=3715)."
         required: true
         type: string
         default: "2d1de629d4204d25cc0c8927b959d9135d9781f4"
@@ -50,10 +50,10 @@ on:
         options: ["On", "Off"]
         default: "On"
       susfs_ref:
-        description: "CCTV18 susfs4oki ref (oki-android15-6.6). v112 DEFAULT 3f6aae5 = SUSFS v2.3.0, latest CCTV18 (2026-10-15, synced to KernelSU 0a1f3ff). Verified with sukisu 2d1de62: every SUSFS-touched object and the full driver compile, and every driver<->SUSFS symbol resolves (incl. ksu_install_su_fd and the new SELinux-hide symbols). Older pins: 40e6c19 (v2.2.0) pairs ONLY with sukisu f2201c4; f2201c4 lacks ksu_install_su_fd() so it cannot link against any v2.3.x. MUST MATCH sukisu_ref generation; a mismatch makes the kernel skip the su redirect for every app and shell."
+        description: "CCTV18 susfs4oki ref (oki-android15-6.6). v113 DEFAULT 2919a9a = SUSFS v2.3.0 (2026-09-26), the newest CCTV18 commit whose SELinux-hide interface matches SukiSU builtin. Do NOT use 3f6aae5 (2026-10-15) here: it removed context_struct_compute_av_fn / security_dump_masked_av_fn that SukiSU selinux_hide.c links against, so vmlinux fails with an undefined symbol (v112 CI). 3f6aae5 is used on the BakaSU lane. MUST MATCH sukisu_ref generation."
         required: true
         type: string
-        default: "3f6aae536724af0df3dfa15f932034d14a5dbc5c"
+        default: "2919a9ad01205c21b1ce346f6fda08a979c58003"
       susfs_patch_policy:
         description: "strict = fail on reject; audited_cctv18 = allow known task_mmu reject only; native_cctv18 = CCTV18-style continue/audit."
         required: true
@@ -67,10 +67,10 @@ on:
         options: [inline_susfs, sukisu_auto, kprobe_test]
         default: inline_susfs
       kernel_suffix:
-        description: "Stock-like LOCALVERSION without leading dash (this is the real uname -r). Leave default for current OP13 stock mimic / best app compatibility."
+        description: "Stock-like LOCALVERSION without leading dash (this is the real uname -r). Default = ColorOS 17 CN stock (PJZ110_17.0.0.103 / B110P02): android15-8-g9bc34d5b0c79-abogki537459655-4k. ColorOS 16 stock was android15-8-g93e223c276e7-abogki500782043-4k. Match the uname -r of the ROM you run."
         required: false
         type: string
-        default: "android15-8-g93e223c276e7-abogki500782043-4k"
+        default: "android15-8-g9bc34d5b0c79-abogki537459655-4k"
       kernel_name:
         description: "Display name shown in kernel-manager apps and the flash banner (does NOT change uname -r). Customise this freely, e.g. 'OX13-SukiSU'."
         required: false
@@ -95,7 +95,7 @@ on:
         options: ["On", "Off"]
         default: "On"
       bbg:
-        description: "Enable Baseband Guard if CCTV18 patch exists and applies cleanly."
+        description: "Baseband Guard LSM (cctv18/Baseband-guard, pinned a5b57f1): blocks writes to modem/baseband partitions from Android. Added as an LSM (CONFIG_BBG + LSM list). v113/v110: actually installed now (earlier versions searched for a patch that does not exist and silently skipped)."
         required: true
         type: choice
         options: ["On", "Off"]
@@ -107,13 +107,13 @@ on:
         options: ["Off", "On", "Default"]
         default: "On"
       adios:
-        description: "Enable ADIOS I/O scheduler if CCTV18 patch exists and applies cleanly."
+        description: "ADIOS I/O scheduler, built in and set as the default scheduler (lower I/O latency). Already in the CCTV18 6.6.118 source; v113/v110 sets it =y (earlier versions silently skipped it)."
         required: true
         type: choice
         options: ["On", "Off"]
         default: "On"
       rekernel:
-        description: "Enable Re:Kernel (best-effort: applied only if the CCTV18 patch dry-runs cleanly, else skipped)."
+        description: "Re:Kernel driver (for Freezer/NoActive-style background freezing apps). Already in the CCTV18 source; v113/v110 sets it =y (earlier versions silently skipped it)."
         required: true
         type: choice
         options: ["On", "Off"]
@@ -147,15 +147,15 @@ on:
         type: string
         default: "F"
       BUILD_USER:
-        description: "KBUILD_BUILD_USER"
+        description: "KBUILD_BUILD_USER, shown in /proc/version. Default kleaf = what Google-built GKI kernels report."
         required: false
         type: string
-        default: "ox1d3x3"
+        default: "kleaf"
       BUILD_HOST:
-        description: "KBUILD_BUILD_HOST"
+        description: "KBUILD_BUILD_HOST, shown in /proc/version. Default build-host = what Google-built GKI kernels report."
         required: false
         type: string
-        default: "op13-cctv18-sukisu"
+        default: "build-host"
 concurrency:
   group: op13-sukisu-cctv18-inline-${{ github.ref }}
   cancel-in-progress: false
@@ -261,7 +261,7 @@ jobs:
           mkdir -p kernel_workspace _ox_debug artifacts
 
           echo "==> Cloning CCTV18 build assets only"
-          # v112: pin the CCTV18 assets repo (CVE patch, config.patch, feature patches).
+          # v113: pin the CCTV18 assets repo (CVE patch, config.patch, feature patches).
           git clone "https://github.com/${CCTV18_BUILD_REPO}.git" cctv18_assets
           git -C cctv18_assets checkout -q "${CCTV18_ASSETS_REF}" || {
             echo "::error::Could not checkout pinned CCTV18 assets ref ${CCTV18_ASSETS_REF}."; exit 1; }
@@ -269,7 +269,7 @@ jobs:
 
           cd kernel_workspace
           echo "==> Downloading CCTV18 OP13 common kernel source at pinned commit ${CCTV18_KERNEL_COMMIT}"
-          # v112: pin source to a COMMIT zip, fall back to branch head if unavailable.
+          # v113: pin source to a COMMIT zip, fall back to branch head if unavailable.
           aria2c -s16 -x16 -k1M --retry-wait=5 --max-tries=5 \
             "https://github.com/${CCTV18_COMMON_REPO}/archive/${CCTV18_KERNEL_COMMIT}.zip" \
             -o common.zip || \
@@ -304,6 +304,13 @@ jobs:
           if [ -f common/scripts/setlocalversion ]; then
             sed -i 's/ -dirty//g' common/scripts/setlocalversion
             sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' common/scripts/setlocalversion || true
+            # Stock-mimic: kill the trailing "+" that scripts/setlocalversion
+            # appends (scm_version --short) for any git tree not on an annotated
+            # tag. Without this the real uname -r is
+            # "...-4k+", which no stock ColorOS kernel has -- a detection signal
+            # and a mismatch with the ROM. Same neutralization CCTV18's own
+            # builder uses. CONFIG_LOCALVERSION still supplies the -<suffix>.
+            sed -i 's/${scm_version}//' common/scripts/setlocalversion
           fi
 
           echo "==> Source layout" | tee ../_ox_debug/source-layout.txt
@@ -370,7 +377,7 @@ jobs:
 
           # Use SukiSU Ultra's own setup script, then audit that it did not silently fall back.
           # This keeps the root framework clean: no KernelSU-Next/ReSukiSU glue in the SukiSU-first workflow.
-          # v112: fetch setup.sh from the PINNED SukiSU commit, not main.
+          # v113: fetch setup.sh from the PINNED SukiSU commit, not main.
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/${SUKISU_SETUP_REF}/kernel/setup.sh" | bash -s "$selected_ref"
 
           if [ -d KernelSU ]; then
@@ -433,7 +440,7 @@ jobs:
             echo "sukisu_tag=$tag" >> "$GITHUB_OUTPUT"
           fi
 
-          # v112: apk_sign.patch is OFF by default. SukiSU Ultra ships its own
+          # v113: apk_sign.patch is OFF by default. SukiSU Ultra ships its own
           # manager-signature verification, so CCTV18's KernelSU apk_sign.patch is
           # unnecessary here and never dry-runs cleanly on the SukiSU tree -- it only
           # produced a recurring skip-warning. Set OX_TRY_APK_SIGN=1 in the workflow
@@ -507,7 +514,7 @@ jobs:
             grep -n "KSU_SULOG_EVENT_IOCTL_GRANT_ROOT" common/drivers/kernelsu/sulog/event.c | tee -a "$GITHUB_WORKSPACE/_ox_debug/sukisu-compile-compat.txt" || true
           fi
 
-          # ---- v112: pkg_observer repair (upstream builtin bug, 2026-10-08) ----
+          # ---- v113: pkg_observer repair (upstream builtin bug, 2026-10-08) ----
           # SukiSU builtin c895920 ("pkg_observer: defer track_throne to task_work",
           # cherry-picked from KernelSU #3871) calls
           #     track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS);
@@ -544,7 +551,7 @@ jobs:
           rm -rf susfs4ksu
 
           echo "==> Cloning CCTV18 SUSFS only: cctv18/susfs4oki @ ${{ inputs.susfs_ref }}"
-          # v112: susfs_ref may be a BRANCH/TAG or a COMMIT SHA.
+          # v113: susfs_ref may be a BRANCH/TAG or a COMMIT SHA.
           # `git clone --branch` only accepts branch/tag names, so a pinned SHA has
           # to be fetched explicitly (verified working: GitHub allows shallow
           # fetch-by-SHA on this repo).
@@ -588,7 +595,7 @@ jobs:
           echo "Reason: v77 reached final link, then failed on SELinux policy-query symbols. Keep this lane clean and compile-safe first."
 
           cd common
-          # ---- v112: upstream security fix CVE-2026-43499 (rtmutex) ----
+          # ---- v113: upstream security fix CVE-2026-43499 (rtmutex) ----
           # Fixes a NULL-pointer dereference in remove_waiter(): when called via
           # rt_mutex_start_proxy_lock(), waiter->task may be NULL (never enqueued),
           # and the old code dereferenced it unconditionally.
@@ -623,7 +630,56 @@ jobs:
             echo "CVE-2026-43499: patch file not found" > "$GITHUB_WORKSPACE/_ox_debug/cve-status.txt"
           fi
 
-          # ---- v112: driver/SUSFS pairing check ----
+          # ---- v113: upstream 6.6-stable security fix (posix-cpu-timers UAF) ----
+          # Backport of the 6.6-stable commit
+          #   12a891c773aeb5823d63dbd0cb2ab931d6c21c9b
+          #   "posix-cpu-timers: Prevent UAF caused by non-leader exec() race"
+          # (mainline 920f893f735e). It fixes a use-after-free reachable from
+          # ordinary userspace (timer_delete racing a non-leader exec()), which on
+          # affected 6.6 builds is a local-root primitive. CCTV18's 6.6.118 source
+          # predates it. Applied the same best-effort way as CVE-2026-43499: fetched
+          # from the pinned upstream-stable commit, verified absent, dry-run checked,
+          # applied all-or-nothing; the build continues if the kernel already has it
+          # or if the context no longer matches. Touches only kernel/{exit,signal}.c
+          # and kernel/time/posix-cpu-timers.c -- no headers, so no GKI 2.0 KMI
+          # impact. Set OX_SKIP_UAF_FIX=1 in the workflow env to skip it.
+          if [ "${OX_SKIP_UAF_FIX:-0}" = "1" ]; then
+            echo "posix-cpu-timers UAF fix: skipped (OX_SKIP_UAF_FIX=1)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+          else
+            UAF_SHA="12a891c773aeb5823d63dbd0cb2ab931d6c21c9b"
+            UAF_DIR="$GITHUB_WORKSPACE/_ox_sec_posix_timers"
+            rm -rf "$UAF_DIR"; mkdir -p "$UAF_DIR"
+            (
+              cd "$UAF_DIR"
+              git init -q
+              git remote add origin https://github.com/gregkh/linux
+              # depth=2 so the commit's parent is present and `git show` yields the
+              # real per-commit diff rather than whole-file additions.
+              git fetch -q --depth=2 origin "$UAF_SHA"
+              git show FETCH_HEAD -- kernel/time/posix-cpu-timers.c kernel/exit.c kernel/signal.c > uaf.patch
+            ) > "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers-fetch.log" 2>&1 || true
+            UAF_PATCH="$UAF_DIR/uaf.patch"
+            if [ ! -s "$UAF_PATCH" ]; then
+              echo "::warning::Could not fetch the posix-cpu-timers UAF fix; kernel is NOT patched for it."
+              echo "posix-cpu-timers UAF fix: fetch failed (NOT applied)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+            elif patch -p1 --dry-run -R -F3 < "$UAF_PATCH" >/dev/null 2>&1; then
+              echo "posix-cpu-timers UAF fix: already present in source (skipped)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+            elif patch -p1 --dry-run -N -F3 < "$UAF_PATCH" > "$GITHUB_WORKSPACE/_ox_debug/dryrun-posix-timers.log" 2>&1; then
+              patch -p1 -N -F3 < "$UAF_PATCH" > "$GITHUB_WORKSPACE/_ox_debug/apply-posix-timers.log" 2>&1
+              if grep -q "timer_lock_sighand" kernel/time/posix-cpu-timers.c; then
+                echo "posix-cpu-timers UAF fix: applied ($UAF_SHA)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+              else
+                echo "::warning::posix-cpu-timers UAF fix reported success but the marker is missing; treating as NOT applied."
+                echo "posix-cpu-timers UAF fix: NOT applied (verification failed)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+              fi
+            else
+              echo "::warning::posix-cpu-timers UAF fix did not dry-run cleanly (context changed or already fixed). Skipped -- not partially patched."
+              echo "posix-cpu-timers UAF fix: SKIPPED (dry-run failed)" | tee "$GITHUB_WORKSPACE/_ox_debug/sec-posix-timers.txt"
+              cat "$GITHUB_WORKSPACE/_ox_debug/dryrun-posix-timers.log" || true
+            fi
+          fi
+
+          # ---- v113: driver/SUSFS pairing check ----
           # The su hook is guarded in fs/exec.c. CCTV18 SUSFS 525c450 renamed that
           # guard from susfs_is_current_proc_umounted() to
           # susfs_is_current_proc_no_su(); SukiSU e060b7c switched the driver to set
@@ -687,12 +743,12 @@ jobs:
             fi
           fi
 
-          echo "==> 69_hide_stuff.patch is intentionally not applied in v112 SukiSU stable lane."
+          echo "==> 69_hide_stuff.patch is intentionally not applied in v113 SukiSU stable lane."
           echo "    SUSFS inline remains enabled; extra SELinux/map-hide policy-query patches are deferred to ReSuki/test builds."
 
 
 
-          # ---- v112: verify the SUSFS su-hook guard is the FIXED variant ----
+          # ---- v113: verify the SUSFS su-hook guard is the FIXED variant ----
           # History: CCTV18 susfs4oki 83dcd81 (2026-08-15) guarded the su hook in
           # fs/exec.c with susfs_is_current_proc_umounted(). That flag is set for
           # every SUSFS-"umounted" process -- i.e. every zygote-spawned app AND every
@@ -708,7 +764,7 @@ jobs:
             echo "==> su-hook guard OK: fs/exec.c uses susfs_is_current_proc_no_su() (fixed variant)."
             echo "su-hook guard: no_su (FIXED)" > "$GITHUB_WORKSPACE/_ox_debug/su-hook-guard.txt"
           elif grep -q "susfs_is_current_proc_umounted" fs/exec.c 2>/dev/null; then
-            # v112: OLD generation is VALID when the driver is also old generation.
+            # v113: OLD generation is VALID when the driver is also old generation.
             # The pairing check above is authoritative; this is informational only.
             echo "==> su-hook guard: susfs_is_current_proc_umounted() (OLD generation)."
             echo "    Valid only with an OLD-generation driver (e.g. sukisu 6c13a06)."
@@ -741,21 +797,21 @@ jobs:
             echo "This does not import another SUSFS tree and does not touch the core SUSFS fs/include payload."
           } | tee "$GITHUB_WORKSPACE/_ox_debug/selinux-policy-query-guard.log"
 
-          # ---- v112: guard keyed to the VERIFIED pair ----
+          # ---- v113: guard keyed to the VERIFIED pair ----
           # The guard existed because older SukiSU builtin + SUSFS failed the final
           # link on the SELinux-hide symbols (v77). It also meant SukiSU's
           # selinux_hide feature had NO kernel hooks at all on this lane.
-          # v112 compile-verified sukisu 2d1de62 + susfs 3f6aae5: hooks.c,
+          # v113 verified sukisu 2d1de62 + susfs 2919a9a (full vmlinux link): hooks.c,
           # selinuxfs.c, ss/services.c and the full driver compile, and every
           # driver<->SUSFS symbol (backup_sepolicy, fake_status,
           # fake_status_initialize_key, initialize_fake_status, my_security_*,
           # ksu_selinux_hide_*) resolves to a global definition. For THAT pair the
-          # hooks stay ON (they are dormant until the selinux_hide feature is
-          # enabled). Any other pair keeps the guard, i.e. exactly the v111
-          # behaviour, because only a real link proves compatibility.
+          # hooks stay ON (dormant until the selinux_hide feature is
+          # enabled). Any other pair keeps the guard, i.e. the v112
+          # behaviour (hooks gated off), because only a real link proves it.
           # Env overrides: OX_SELINUX_HIDE_HOOKS=on|off (default: auto).
           VERIFIED_SUKI="2d1de629d4204d25cc0c8927b959d9135d9781f4"
-          VERIFIED_SUSFS="3f6aae536724af0df3dfa15f932034d14a5dbc5c"
+          VERIFIED_SUSFS="2919a9ad01205c21b1ce346f6fda08a979c58003"
           got_suki="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/KernelSU" rev-parse HEAD 2>/dev/null || echo unknown)"
           got_susfs="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/susfs4ksu" rev-parse HEAD 2>/dev/null || echo unknown)"
           mode="${OX_SELINUX_HIDE_HOOKS:-auto}"
@@ -844,10 +900,50 @@ jobs:
             fi
           }
 
-          clean_apply_optional_patch "adios" "${{ inputs.adios == 'On' }}" "(^|/).*adios.*\.patch$"
-          clean_apply_optional_patch "baseband_guard" "${{ inputs.bbg == 'On' }}" "(^|/).*(baseband|bbg).*\.patch$"
+          # ---- v113: ADIOS / Re:Kernel / Baseband Guard, done properly ----
+          # Up to v112 these three inputs looked for .patch files that do not exist
+          # in cctv18_assets, logged "Optional patch not found" and silently did
+          # nothing. ADIOS (block/Kconfig.iosched) and Re:Kernel (drivers/rekernel)
+          # are already IN the CCTV18 6.6.118 source and only need =y; Baseband
+          # Guard is an LSM added by cctv18/Baseband-guard's setup.sh. Same method
+          # as CCTV18's own builder; BBG pinned to a commit. None of the three
+          # touch kernel headers (checked), so no GKI KMI impact.
+          if [ "${{ inputs.adios == 'On' }}" = "true" ]; then
+            if grep -q '^config MQ_IOSCHED_ADIOS' block/Kconfig.iosched 2>/dev/null; then
+              echo "OX_EN_ADIOS=1" >> "$GITHUB_ENV"; echo "adios: source present -> will be =y (default scheduler)" | tee -a "$GITHUB_WORKSPACE/_ox_debug/optional-patches.log"
+            else
+              echo "::warning::ADIOS requested but block/Kconfig.iosched has no MQ_IOSCHED_ADIOS; skipped."
+            fi
+          fi
+          if [ "${{ inputs.rekernel == 'On' }}" = "true" ]; then
+            if [ -f drivers/rekernel/Kconfig ] && grep -q '^config REKERNEL' drivers/rekernel/Kconfig; then
+              echo "OX_EN_REKERNEL=1" >> "$GITHUB_ENV"; echo "rekernel: source present -> will be =y" | tee -a "$GITHUB_WORKSPACE/_ox_debug/optional-patches.log"
+            else
+              echo "::warning::Re:Kernel requested but drivers/rekernel is missing; skipped."
+            fi
+          fi
+          if [ "${{ inputs.bbg == 'On' }}" = "true" ]; then
+            BBG_SHA="a5b57f15d6b597a1bd157c42330fe80020b1d628"
+            rm -rf Baseband-guard
+            if git clone -q https://github.com/cctv18/Baseband-guard Baseband-guard && git -C Baseband-guard checkout -q "$BBG_SHA"; then
+              # setup.sh: with an existing clone + a ref argument it checks out exactly that ref
+              git -C Baseband-guard show "$BBG_SHA:setup.sh" > "$GITHUB_WORKSPACE/_ox_debug/bbg-setup.sh"
+              # Its final "set your defconfig" notice uses gawk-only awk and can exit
+              # non-zero on mawk; the install itself is verified right below instead.
+              sh "$GITHUB_WORKSPACE/_ox_debug/bbg-setup.sh" "$BBG_SHA" >> "$GITHUB_WORKSPACE/_ox_debug/optional-patches.log" 2>&1 \
+                || echo "bbg: setup.sh exited non-zero (LSM notice); verifying install..." | tee -a "$GITHUB_WORKSPACE/_ox_debug/optional-patches.log"
+              got="$(git -C Baseband-guard rev-parse HEAD)"
+              if [ "$got" = "$BBG_SHA" ] && [ -e security/baseband-guard/Kconfig ] && grep -q 'baseband-guard' security/Makefile \
+                 && grep -q 'security/baseband-guard/Kconfig' security/Kconfig; then
+                echo "OX_EN_BBG=1" >> "$GITHUB_ENV"; echo "bbg: installed at $got -> will be =y" | tee -a "$GITHUB_WORKSPACE/_ox_debug/optional-patches.log"
+              else
+                echo "::error::Baseband Guard setup did not complete as expected (HEAD=$got)."; exit 1
+              fi
+            else
+              echo "::warning::Could not fetch Baseband-guard; BBG skipped."
+            fi
+          fi
           clean_apply_optional_patch "unicode" "true" "(^|/).*unicode.*\.patch$"
-          clean_apply_optional_patch "rekernel" "${{ inputs.rekernel == 'On' }}" "(^|/).*(rekernel|re-kernel).*\.patch$"
           clean_apply_optional_patch "fengchi" "${{ inputs.fengchi == 'On' }}" "(^|/).*(fengchi|hmbird|sched).*\.patch$"
 
           clean_apply_patch_group() {
@@ -919,7 +1015,7 @@ jobs:
           set_n() { scripts/config --file "$cfg" -d "$(cfg_sym "$1")" || true; }
           set_str() { scripts/config --file "$cfg" --set-str "$(cfg_sym "$1")" "$2" || true; }
 
-          echo "==> Applying v112 SukiSU Ultra daily-driver config profile: ${{ inputs.profile }}"
+          echo "==> Applying v113 SukiSU Ultra daily-driver config profile: ${{ inputs.profile }}"
           set_y CONFIG_KSU
           set_y CONFIG_KSU_MANUAL_SU
 
@@ -971,7 +1067,7 @@ jobs:
           esac
 
           if [ "${{ inputs.SUSFS }}" = "On" ]; then
-            # v112: only the 10 SUSFS options that ACTUALLY EXIST in the root driver.
+            # v113: only the 10 SUSFS options that ACTUALLY EXIST in the root driver.
             # Verified against the Kconfig of all three projects (SukiSU-Ultra,
             # ReSukiSU, pershoot/KernelSU-Next) -- each defines exactly these 10.
             # REMOVED because no project defines them, so olddefconfig silently
@@ -1002,6 +1098,16 @@ jobs:
 
 
           # Mountify / Magic Mount friendly tmpfs support.
+          # v113: enable the source-present features detected in the optional stage
+          if [ "${OX_EN_ADIOS:-0}" = "1" ]; then set_y CONFIG_MQ_IOSCHED_ADIOS; set_y CONFIG_MQ_IOSCHED_DEFAULT_ADIOS; fi
+          if [ "${OX_EN_REKERNEL:-0}" = "1" ]; then set_y CONFIG_REKERNEL; fi
+          if [ "${OX_EN_BBG:-0}" = "1" ]; then
+            set_y CONFIG_BBG
+            cur_lsm="$(sed -n 's/^CONFIG_LSM="\(.*\)"$/\1/p' "$cfg")"
+            [ -n "$cur_lsm" ] || cur_lsm="landlock,lockdown,yama,loadpin,safesetid,selinux,smack,tomoyo,apparmor,bpf"
+            case ",$cur_lsm," in *,baseband_guard,*) ;; *) cur_lsm="$cur_lsm,baseband_guard" ;; esac
+            scripts/config --file "$cfg" --set-str LSM "$cur_lsm"
+          fi
           set_y CONFIG_TMPFS_XATTR
           set_y CONFIG_TMPFS_POSIX_ACL
 
@@ -1077,7 +1183,7 @@ jobs:
               CONFIG_IP6_NF_TARGET_MASQUERADE; do
               set_y "$opt"
             done
-            # v112: symbol-name corrections verified against the real 6.6.118
+            # v113: symbol-name corrections verified against the real 6.6.118
             # net/netfilter Kconfig. The following DID NOT EXIST and were silently
             # dropped by olddefconfig, so these features were never actually built:
             #   CONFIG_NETFILTER_XT_TARGET_HL -> real symbol is ..._TARGET_HL
@@ -1088,7 +1194,7 @@ jobs:
             # The extra IP_SET_* variants match CCTV18's own builder and make ipset
             # actually usable for firewall / ad-block modules.
             scripts/config --file "$cfg" --set-val CONFIG_IP_SET_MAX 65534 || true
-            # v112: CCTV18 config.patch hides CONFIG_IP6_NF_NAT from config_data.gz to
+            # v113: CCTV18 config.patch hides CONFIG_IP6_NF_NAT from config_data.gz to
             # avoid a "device has an internal problem" boot banner on some units,
             # without disabling the feature. Best-effort.
             CFG_PATCH="$GITHUB_WORKSPACE/cctv18_assets/other_patch/config.patch"
@@ -1198,7 +1304,7 @@ jobs:
           echo "==> Final config scan"
           grep -E 'CONFIG_KSU|CONFIG_KPM|CONFIG_KALLSYMS|CONFIG_LOCALVERSION|CONFIG_TCP_CONG_BBR|CONFIG_DEFAULT_BBR|CONFIG_IP_SET|CONFIG_NTSYNC|CONFIG_LTO|CONFIG_CC_OPTIMIZE|CONFIG_NETFILTER_XT_TARGET_HL|CONFIG_ADIOS|CONFIG_BBG|CONFIG_BASEBAND|CONFIG_ZRAM|CONFIG_ZSMALLOC|CONFIG_CRYPTO_LZ4|CONFIG_LZ4|CONFIG_ZSTD' out/.config | tee "$GITHUB_WORKSPACE/_ox_debug/config-scan.txt" || true
 
-          # ---- v112 SUSFS config audit ----
+          # ---- v113 SUSFS config audit ----
           # Verifies that every SUSFS option we asked for actually landed as =y in
           # the FINAL .config. Previously four options were requested that no root
           # project defines, so olddefconfig silently dropped them and the build
@@ -1250,7 +1356,7 @@ jobs:
 
           MAKE_ARGS=(O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 CC="ccache clang")
           echo "==> Building Image"
-          # ---- v112: report a driver version that matches the manager APK ----
+          # ---- v113: report a driver version that matches the manager APK ----
           # SukiSU's kernel/Kbuild computes the driver version from a LIVE
           # api.github.com commit count on `main`:
           #     KSU_VERSION := VERSION_BASE(40000) + LOCAL_COUNT - VERSION_OFFSET(2815)
@@ -1261,13 +1367,13 @@ jobs:
           #
           # The number is set purely by the commit count passed as GITHUB_COMMITS on
           # the make line; it is INDEPENDENT of the source commit we compile. So we
-          # can build the newest compile-verified driver (v112: builtin 2d1de62) AND
+          # can build the newest compile-verified driver (v113: builtin 2d1de62) AND
           # report the exact version the current manager APK expects.
           #
           # Current release: SukiSU_v4.2.0_40900_releases.apk -> version code 40900.
           #     40900 = 40000 + LOCAL_COUNT - 2815  ->  LOCAL_COUNT = 3715
           # So GITHUB_COMMITS=3715 makes the driver report 40900 == v4.2.0 manager.
-          # v112: verified ABI-compatible with 2d1de62: every KSU_IOCTL_* number is
+          # v113: verified ABI-compatible with 2d1de62: every KSU_IOCTL_* number is
           # unchanged vs the v4.2.0 tag and uapi/app_profile.h is byte-identical, so
           # only the version number needed fixing (sandbox build printed 40900).
           #
@@ -1288,8 +1394,8 @@ jobs:
             exit 1
           fi
 
-          cp -f "$image" "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112"
-          sha256sum "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112" | tee "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112.sha256"
+          cp -f "$image" "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113"
+          sha256sum "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113" | tee "$GITHUB_WORKSPACE/artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113.sha256"
 
           uts="unknown"
           if [ -f out/include/generated/utsrelease.h ]; then
@@ -1305,12 +1411,12 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf ak3_work
-          # v112: pin AnyKernel3 (unpinned master broke flashing once already).
+          # v113: pin AnyKernel3 (unpinned master broke flashing once already).
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git ak3_work
           git -C ak3_work fetch -q --depth=1 origin "${AK3_REF}" && git -C ak3_work checkout -q FETCH_HEAD || \
             echo "::warning::Could not pin AnyKernel3 to ${AK3_REF}; using master HEAD."
           git -C ak3_work rev-parse HEAD | tee "$GITHUB_WORKSPACE/_ox_debug/anykernel3_commit.txt"
-          # --- AK3 naming-convention guard (v112) ---
+          # --- AK3 naming-convention guard (v113) ---
           # AK3 renamed its anykernel.sh settings to UPPERCASE. We write both
           # spellings, but if upstream ever changes convention AGAIN this guard
           # makes it obvious in the log instead of silently shipping a zip that
@@ -1344,7 +1450,7 @@ jobs:
           RAMFIXSVC
           chmod 0755 ak3_work/ramfix/service.sh
           rm -rf ak3_work/.git ak3_work/.github ak3_work/README.md || true
-          cp -f artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112 ak3_work/Image
+          cp -f artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113 ak3_work/Image
 
           cat > ak3_work/anykernel.sh <<'AK3'
           ### AnyKernel3 Ramdisk Mod Script
@@ -1375,7 +1481,7 @@ jobs:
           ### AnyKernel install
           ## boot shell variables
           # OP13 / PJZ110 is A/B slot device. Use partition-name detection, not old omap path.
-          # v112 FLASH FIX: AnyKernel3 upstream renamed these settings to UPPERCASE
+          # v113 FLASH FIX: AnyKernel3 upstream renamed these settings to UPPERCASE
           # (BLOCK, IS_SLOT_DEVICE, ...). This workflow clones AK3 master unpinned,
           # so a fresh build picks up the new ak3-core.sh, which IGNORES the old
           # lowercase names. With $BLOCK unset, AK3 cannot resolve the boot
@@ -1488,7 +1594,7 @@ jobs:
           chmod 0755 ak3_work/anykernel.sh
 
           cat > ak3_work/OX_CCTV18_CLEAN_BUILD_INFO.txt <<EOF
-          OX1D3X3 OP13 SukiSU Ultra + CCTV18 INLINE SUSFS v112
+          OX1D3X3 OP13 SukiSU Ultra + CCTV18 INLINE SUSFS v113
           Device: OnePlus 13 / sun / PJZ110
           Kernel source: cctv18/android_kernel_common_oneplus_sm8750 @ ${{ env.CCTV18_KERNEL_REF }}
           Build assets: cctv18/oppo_oplus_realme_sm8750
@@ -1507,7 +1613,7 @@ jobs:
           EOF
           sed -i 's/^          //' ak3_work/OX_CCTV18_CLEAN_BUILD_INFO.txt
 
-          zip_name="AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112_${{ github.run_number }}_FLASH_THIS.zip"
+          zip_name="AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113_${{ github.run_number }}_FLASH_THIS.zip"
           ( cd ak3_work && zip -r9 "../artifacts/$zip_name" . >/dev/null )
           sha256sum "artifacts/$zip_name" | tee "artifacts/$zip_name.sha256"
 
@@ -1574,7 +1680,7 @@ jobs:
 
           if [ -f "$GITHUB_STEP_SUMMARY" ]; then
             {
-              echo "# OP13 SukiSU Ultra + CCTV18 Inline StockLike Daily v112"
+              echo "# OP13 SukiSU Ultra + CCTV18 Inline StockLike Daily v113"
               echo ""
               echo "## Verdict"
               echo "- Main flashable zip uses fixed AnyKernel3 OP13 boot detection."
@@ -1591,7 +1697,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v112-${{ github.run_number }}
+          name: OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v113-${{ github.run_number }}
           path: |
             artifacts/**
             _ox_debug/**
@@ -1604,11 +1710,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -s artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112 ]; then
-            echo "::error::Build failed before producing Image. Download OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v112 debug artifact."
+          if [ ! -s artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113 ]; then
+            echo "::error::Build failed before producing Image. Download OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v113 debug artifact."
             exit 1
           fi
-          if [ "true" = "true" ] && ! ls artifacts/AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v112_*_FLASH_THIS.zip >/dev/null 2>&1; then
+          if [ "true" = "true" ] && ! ls artifacts/AK3_OP13_SukiSUUltra_CCTV18_inline_stocklike_v113_*_FLASH_THIS.zip >/dev/null 2>&1; then
             echo "::error::Image built but AnyKernel3 flashable ZIP was not produced."
             exit 1
           fi
