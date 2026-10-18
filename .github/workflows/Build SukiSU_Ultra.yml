@@ -15,6 +15,9 @@ env:
   # v114 pins (reproducible build).
   CCTV18_ASSETS_REF: "21db9e7d547ca625bd5aa734fb5dfc8b94ea48ef"
   CCTV18_KERNEL_COMMIT: "2a4726b11594dd57d0779d2685fad5c81e5ed553"
+  # Flasher (AnyKernel3) branding -- matches the release template.
+  OX_ROOT_DISPLAY_NAME: "SukiSU Ultra"
+  OX_ROOT_CREDIT: "@SukiSU-Ultra"
   SUKISU_SETUP_REF: "2d1de629d4204d25cc0c8927b959d9135d9781f4"
   AK3_REF: "020dfeccf9d7e962a48400fc94d3e451df92eead"
   CCACHE_MAXSIZE: 8G
@@ -1495,7 +1498,7 @@ jobs:
           cat > ak3_work/anykernel.sh <<'AK3'
           ### AnyKernel3 Ramdisk Mod Script
           ## osm0sis @ xda-developers
-          ## OX1D3X3 OP13 SukiSU + CCTV18 clean SUSFS package
+          ## OX1D3X3 OP13 ${{ env.OX_ROOT_DISPLAY_NAME }}+SUSFS
 
           ### AnyKernel setup
           # global properties
@@ -1557,14 +1560,14 @@ jobs:
           ui_print '                 /_/ \_\  |_|'
           ui_print '===================================================='
           ui_print ' '
-          ui_print 'PJZ110 | SukiSU Ultra [Inline StockLike Daily] + CCTV18 SUSFS'
+          ui_print 'PJZ110 | ${{ env.OX_ROOT_DISPLAY_NAME }} [Daily-Driver optimised]'
           ui_print 'Kernel : 6.6.118-${{ inputs.kernel_suffix }}'
           ui_print 'Hook   : ${{ inputs.hook_mode }} (target: inline SUSFS)'
           ui_print 'Audit  : CONFIG_KSU + CONFIG_KSU_SUSFS + inline hook audit'
           ui_print 'Build  : #${{ github.run_number }} (${{ inputs.kernel_suffix }})'
           ui_print 'Builder: @Ox1d3x3'
-          ui_print 'Credits: @SukiSU-Ultra, @cctv18, osm0sis, @mrcxlinux'
-          ui_print 'Source : CCTV18 susfs4oki only - no mixed SUSFS patch tree'
+          ui_print 'Credits: ${{ env.OX_ROOT_CREDIT }}, @cctv18, osm0sis'
+          ui_print 'SUSFS Source : CCTV18 susfs4oki'
           ui_print "ZRAM   : kernel config=${{ inputs.zram_module == 'On' }} / preferred=${{ inputs.zram_comp }}"
           ui_print ' '
 
@@ -1599,7 +1602,7 @@ jobs:
           esac
 
           ui_print ' '
-          ui_print '  -> Thank you for using this kernel'
+          ui_print '  -> Thank you for using this kernel, Please dont forget to Star the Project'
           $ksu_supported || abort '  -> Non-GKI device, abort.'
 
           # boot install
@@ -1671,7 +1674,7 @@ jobs:
             echo "::error::OX1D3X3 custom install banner was not packaged."
             exit 1
           fi
-          if ! unzip -p "artifacts/$zip_name" anykernel.sh | grep -q 'SukiSU Ultra \[Inline StockLike Daily\]'; then
+          if ! unzip -p "artifacts/$zip_name" anykernel.sh | grep -Fq '${{ env.OX_ROOT_DISPLAY_NAME }} [Daily-Driver optimised]'; then
             echo "::error::OX install info banner was not packaged."
             exit 1
           fi
