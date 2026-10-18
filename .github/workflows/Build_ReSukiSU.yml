@@ -238,7 +238,7 @@ jobs:
           echo "CCACHE_DIR=$CCACHE_DIR" >> "$GITHUB_ENV"
 
       - name: "Restore ccache"
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ runner.os }}-op13-resukisu-cctv18-${{ inputs.SUSFS }}-${{ inputs.resukisu_ref }}-${{ inputs.hook_mode }}-${{ github.ref_name }}

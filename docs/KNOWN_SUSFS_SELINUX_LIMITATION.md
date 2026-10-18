@@ -1,3 +1,7 @@
+> **Superseded — kept for history.** This conclusion was wrong; see
+> [`SELINUX_POLICY_HIDING.md`](./SELINUX_POLICY_HIDING.md). Since SukiSU v113 / BakaSU v110, SELinux context
+> hiding is active in both lanes.
+
 # Known limitation: SUSFS SELinux policy hiding is NOT active
 
 **Applies to:** both lanes (SukiSU Ultra, ReSukiSU), all versions.
