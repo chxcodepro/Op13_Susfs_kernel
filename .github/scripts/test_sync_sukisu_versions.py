@@ -44,6 +44,7 @@ class DropdownTests(unittest.TestCase):
     def test_latest_choice_and_compatibility_values(self):
         updated = sync.update_choices(self.source, "41050")
         self.assertIn('          - "41050"', updated)
+        self.assertIn('          - "40994"', updated)
         self.assertIn('          - "40900"', updated)
         self.assertIn('          - "40796"', updated)
         self.assertIn('        default: "auto"', updated)
@@ -55,10 +56,13 @@ class DropdownTests(unittest.TestCase):
         updated = sync.update_choices(sync.update_choices(self.source, "41050"), "41100")
         self.assertIn('          - "41100"', updated)
         self.assertNotIn('          - "41050"', updated)
+        self.assertIn('          - "40994"', updated)
 
     def test_compatibility_version_is_not_duplicated(self):
-        updated = sync.update_choices(self.source, "40900")
-        self.assertEqual(updated.count('          - "40900"'), 1)
+        for version in sync.COMPATIBILITY_VERSIONS:
+            with self.subTest(version=version):
+                updated = sync.update_choices(self.source, version)
+                self.assertEqual(updated.count(f'          - "{version}"'), 1)
 
     def test_unrelated_content_and_line_endings_are_preserved(self):
         for newline in ["\n", "\r\n"]:

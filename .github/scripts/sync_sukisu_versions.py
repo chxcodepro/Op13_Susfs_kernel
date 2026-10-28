@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 RELEASE_API = "https://api.github.com/repos/SukiSU-Ultra/SukiSU-Ultra/releases/latest"
 WORKFLOW = Path(__file__).resolve().parents[1] / "workflows" / "Build SukiSU_Ultra.yml"
-COMPATIBILITY_VERSIONS = ("40900", "40796")
+COMPATIBILITY_VERSIONS = ("40994", "40900", "40796")
 
 
 def release_version(release):

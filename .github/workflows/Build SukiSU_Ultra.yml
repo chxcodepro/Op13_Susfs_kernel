@@ -44,6 +44,7 @@ on:
         options:
           - auto
           - "41068"
+          - "40994"
           - "40900"
           - "40796"
         default: "auto"

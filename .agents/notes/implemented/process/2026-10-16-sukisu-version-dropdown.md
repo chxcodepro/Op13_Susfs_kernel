@@ -13,9 +13,15 @@ could not see the latest numeric choice before starting a build.
 `sync-sukisu-versions.yml` reads the official latest stable release daily at
 10:23 Asia/Shanghai and on manual dispatch. A standard-library Python script
 updates only the SukiSU version input's description and choices, preserving
-`auto`, the current stable versionCode, and compatibility values `40900` and
-`40796`. A newer stable replaces the previous automatically tracked choice.
+`auto`, the current stable versionCode, and compatibility values `40994`,
+`40900`, and `40796`. A newer stable replaces the previous automatically tracked choice.
 No release change means no commit. API or schema failures leave the file alone.
+
+`40994` remains a permanent compatibility choice for the repaired UAPI 5 pair.
+Manager v4.2.1 / 40994 declares UAPI 5; the newer v4.2.1-r2 / 41068 declares 6.
+GitHub validates choice inputs and rejects a dispatch with HTTP 422 when 40994
+is missing. Keeping it in both the YAML and generator preserves the release
+build's supported Manager selection across daily refreshes.
 
 All three build dispatch forms use Chinese descriptions while preserving input
 keys, choice values, source pins, and feature defaults. The generated version
@@ -47,6 +53,8 @@ this note continues to own dropdown synchronization and Chinese input copy.
   pre-build dropdown stale. The user chose scheduled dropdown synchronization.
 - Fetching choices when opening Run workflow would be immediate, but native
   GitHub choice inputs are static YAML and offer no dynamic API data source.
+- Adding 40994 only to the current YAML unblocks one dispatch, but the next
+  scheduled refresh removes it. The generator retains it as a compatibility value.
 
 ## Consequences
 
@@ -60,6 +68,10 @@ workflow. This change does not validate ColorOS 17 boot or vendor-module
 compatibility.
 
 ## Verification
+
+The 2026-10-27 compatibility addition receives code and YAML review only;
+the tests below describe the initial implementation. Test expectations now cover
+40994 retention after a newer release and deduplication of every compatibility value.
 
 The 12 focused unittest cases pass, covering parsing, deduplication,
 idempotence, replacement, unrelated content and line-ending preservation, dry

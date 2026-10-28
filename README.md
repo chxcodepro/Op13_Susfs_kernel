@@ -136,7 +136,7 @@ several times.
 
 **Sync SukiSU versions** refreshes the dropdown daily at 10:23 Asia/Shanghai
 (GitHub scheduling may be delayed), or when run manually. It keeps `auto`, the
-latest official stable versionCode, `40900`, and `40796`. A changed release
+latest official stable versionCode, `40994`, `40900`, and `40796`. A changed release
 creates one commit on the default branch; unchanged releases create none.
 
 Set the repository Actions secret `SUKISU_VERSION_SYNC_TOKEN` to a fine-grained
@@ -151,6 +151,11 @@ and driver/Manager UAPI before compilation. `auto` reads the official release's
 UAPI header and rejects mismatches before overriding the numeric driver
 version. Explicit numeric selections remain available for legacy pairs and are
 marked `manual-unchecked`; they do not validate Manager compatibility.
+
+For this release, select `40994` and install SukiSU Manager **v4.2.1** (UAPI 5).
+The latest v4.2.1-r2 / 41068 uses UAPI 6; `auto` rejects that newer interface
+against the current UAPI 5 driver. `40994` stays in the compatibility choices
+after scheduled refreshes.
 
 The SukiSU default pairs builtin `0af2cf9` with CCTV18 SUSFS `3f6aae5` (v2.3.0).
 The repository's pinned-source patch completes UAPI 5 reporting and bundled-LKM
