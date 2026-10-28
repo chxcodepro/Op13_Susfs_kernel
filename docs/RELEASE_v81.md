@@ -1,3 +1,6 @@
+> **Historical.** This describes the v81 release line (kernel 6.6.89, three lanes). The current release is
+> [`RELEASE_v114_v111.md`](./RELEASE_v114_v111.md).
+
 # OP13 GKI Kernel — Release v81
 
 Daily‑driver focused **Linux 6.6.89 GKI 2.0** kernel for the **OnePlus 13**

@@ -61,24 +61,25 @@ to
 in those two files, compiling the blocks out. Since no root project defines
 `CONFIG_KSU_SUSFS_SELINUX_POLICY_HIDE`, that permanently disabled the feature.
 
-The driver has since gained the definitions, but the guard kept firing
-**unconditionally** — so SELinux policy hiding stayed off long after the reason
-for it had gone away.
+### Current pair-specific behavior
 
-### Fixed in v99
+The SukiSU guard uses exact source pairs, with `OX_SELINUX_HIDE_HOOKS=auto`:
 
-The guard is now **auto-detecting**. Before applying, it checks whether the root
-driver supplies the symbols:
+- **Fork default `0af2cf9` / `3f6aae5`:** apply the two kernel SELinux helper
+  wrappers needed by the driver, and keep the `hooks.c` / `selinuxfs.c`
+  policy-query replacement blocks gated off. This is the retained UAPI 5 repair.
+- **Upstream alternative `2d1de62` / `2919a9a`:** keep the replacement hooks
+  enabled, following upstream's linked-pair configuration.
+- **Other pairs:** apply the guard. Explicit `on` / `off` overrides remain
+  available for deliberate source-pair validation.
 
-- **Symbols present** → guard is **skipped**, SELinux policy hiding stays
-  **enabled**.
-- **Symbols absent** → guard applies, preserving the original link-failure
-  protection.
+SukiSU records its decision in `_ox_debug/selinux-policy-query-guard.log` and
+`selinux-policy-query-guard-files.txt`. Helper-patch output is in
+`selinux-query-helpers.log` for the default pair.
 
-Each build records the outcome in `_ox_debug/selinux-hide-status.txt`.
-
-Note: the **ReSukiSU lane never had this guard**, so its SELinux policy-query
-code has always been compiled in.
+The **BakaSU lane** defaults to `OX_BAKASU_SELINUX_HIDE_OWNER=bakasu`, retaining
+the driver's own SELinux hiding and excluding the SUSFS SELinux replacement
+sections. See `_ox_debug/selinux-hide-status.txt` for its result.
 
 ## What you must still do (runtime side)
 
@@ -89,8 +90,8 @@ bool ksu_selinux_hide_running __read_mostly = false;
 ```
 
 The feature is **off by default** and is toggled at runtime through the
-manager's feature system (`selinux_hide_feature_set`). So after flashing a v99+
-build you must **enable the SELinux hide feature in the SukiSU manager**.
+manager's feature system (`selinux_hide_feature_set`). For a build with the
+replacement hooks enabled, **enable the SELinux hide feature in the SukiSU manager**.
 If it stays off, scanners will keep seeing KSU contexts even though the kernel
 supports hiding them.
 

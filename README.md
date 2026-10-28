@@ -1,22 +1,23 @@
 <!--
   Op13_Susfs_kernel — README
   Repo: ox1d3x3/Op13_Susfs_kernel
+  README revision: 2026-10-27 (SukiSU Ultra v114 + fork UAPI 5 repair · BakaSU v111)
 -->
 
 <h1 align="center">If This Kernel is useful to you, a ⭐ helps others find it.</h1>
 
 <div align="center">
 
-<img src="./.github/assets/hero.svg" alt="OP13 GKI Kernel banner" width="100%" />
+<img src="./.github/assets/hero.svg" alt="OP13 GKI Kernel banner — OnePlus 13, Android 17, BakaSU and SukiSU Ultra with SUSFS" width="100%" />
 
 <br/>
 
 <!-- Build lanes -->
 <a href="../../actions/workflows/Build_ReSukiSU.yml">
-  <img alt="ReSukiSU build" src="https://img.shields.io/badge/build-ReSukiSU-0A84FF?style=flat-square&logo=github" />
+  <img alt="BakaSU build" src="https://img.shields.io/badge/build-BakaSU%20v111-0A84FF?style=flat-square&logo=github" />
 </a>
 <a href="../../actions/workflows/Build%20SukiSU_Ultra.yml">
-  <img alt="SukiSU Ultra build" src="https://img.shields.io/badge/build-SukiSU%20Ultra-0A84FF?style=flat-square&logo=github" />
+  <img alt="SukiSU Ultra build" src="https://img.shields.io/badge/build-SukiSU%20Ultra%20v114-0A84FF?style=flat-square&logo=github" />
 </a>
 
 <br/>
@@ -34,9 +35,10 @@
 
 <br/>
 
-<img alt="Device" src="https://img.shields.io/badge/Device-OnePlus%2013%20(PJZ110%20%C2%B7%20sun)-111111?style=flat-square" />
+<img alt="Device" src="https://img.shields.io/badge/Device-OnePlus%2013%20CN%20(PJZ110%20%C2%B7%20sun)-111111?style=flat-square" />
+<img alt="ROM" src="https://img.shields.io/badge/ROM-ColorOS%2017%20CN%20(Android%2017)-111111?style=flat-square" />
 <img alt="Kernel" src="https://img.shields.io/badge/Kernel-6.6.118%20(GKI%202.0)-111111?style=flat-square" />
-<img alt="Android" src="https://img.shields.io/badge/Android-15%20%2F%2016-111111?style=flat-square" />
+<img alt="SUSFS" src="https://img.shields.io/badge/SUSFS-v2.3.0%20(CCTV18)-111111?style=flat-square" />
 
 </div>
 
@@ -44,65 +46,90 @@
 
 ## Overview
 
-A daily‑driver focused **Linux 6.6 GKI 2.0** kernel for the **OnePlus 13**
-(`PJZ110` / `sun` / `sm8750`), built entirely from GitHub Actions. The goal is a
-**stock‑like, stable baseline** with modern root + hiding support and a few
-opt‑in performance and battery tweaks — not a maxed‑out benchmark build.
+A daily‑driver focused **Linux 6.6 GKI 2.0** kernel for the **OnePlus 13 CN**
+(`PJZ110` / `sun` / `SM8750`), built entirely from GitHub Actions and targeting
+**ColorOS 17 CN (Android 17)**. The goal is a **stock‑like, stable, battery‑friendly
+baseline** with modern root + SUSFS hiding — not a maxed‑out benchmark build.
 
-Two root solutions are offered as separate build **lanes**, both sharing the
-same CCTV18 OP13 source, toolchain and SUSFS tree:
+Two root solutions are offered as separate build **lanes**, both sharing the same
+CCTV18 OP13 source, toolchain and SUSFS tree:
 
-| Lane | Workflow | Root solution | Pick it if… |
-|---|---|---|---|
-| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) | you want SukiSU Ultra with KPM + inline SUSFS |
-| **ReSukiSU** (Recommended)| `Build_ReSukiSU.yml` | [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) (SukiSU fork) | you want the SukiSU feature set with the ReSukiSU manager stack |
+| Lane | Workflow | Root solution | Manager APK | Pick it if… |
+|---|---|---|---|---|
+| **BakaSU** (Recommended) | `Build_ReSukiSU.yml` | [BakaSU](https://github.com/Baka-SU/BakaSU) (formerly ReSukiSU) | latest BakaSU manager | you want the daily driver — the most tested lane |
+| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) (`builtin` branch + UAPI 5 repair) | UAPI-compatible stable release selected at build time | you want SukiSU Ultra with KPM support |
+
+> [!IMPORTANT]
+> **SukiSU Manager pairing:** this fork retains the builtin UAPI 5 repair.
+> `auto` checks the selected stable Manager's UAPI before building. Install the
+> matching Manager release shown in the build summary; the earlier repair build
+> used v4.2.1 / 40994.
+
+> **About "android15" in the version string.** `uname -r` contains
+> `android15-8` on **stock ColorOS 17 too** — it names the GKI kernel branch
+> (`android15-6.6`), not the Android version. OnePlus ships the 6.6 GKI kernel on
+> Android 17, so this is correct and must not be changed.
+
+> **ReSukiSU is now BakaSU.** The project was renamed upstream; the workflow file
+> keeps its old name (`Build_ReSukiSU.yml`) so existing Actions links and history
+> keep working.
 
 > **KernelSU‑Next lane is DEPRECATED** (archived at
 > [`docs/deprecated/Build_KSUN.yml.deprecated`](./docs/deprecated/Build_KSUN.yml.deprecated)).
-> pershoot's `dev-susfs` branch was force‑pushed and now requires SUSFS helpers
-> (`susfs_is/set/clear_current_proc_no_su`) that CCTV18's `susfs4oki` does not
-> provide, so it cannot build against this project's SUSFS tree. No commit
-> remains that has SUSFS support *without* that dependency. See
-> [`docs/deprecated/WHY_KSUN_DEPRECATED.md`](./docs/deprecated/WHY_KSUN_DEPRECATED.md).
+> See [`docs/deprecated/WHY_KSUN_DEPRECATED.md`](./docs/deprecated/WHY_KSUN_DEPRECATED.md).
 
-> **Builds are produced as GitHub Actions artifacts** on each manual run. If a
-> tagged release exists, grab the ZIP from **[Releases](../../releases)**;
-> otherwise open the relevant **Actions** run and download the artifact.
-
-> **Current release line: `v81`** — feature‑rich daily‑driver defaults
-> (SUSFS inline + KPM + ADIOS + Baseband‑Guard + ZRAM LZ4 + NTSYNC + netfilter,
-> with BBR and Re:Kernel now on by default). FengChi/HMBIRD stays off for
-> stability. See [`docs/RELEASE_v81.md`](./docs/RELEASE_v81.md).
+> **Current release line: SukiSU Ultra `v114` · BakaSU `v111`** — ColorOS 17
+> stock uname, ADIOS + Re:Kernel + Baseband‑Guard actually enabled, two
+> upstream security fixes. See
+> [`docs/RELEASE_v114_v111.md`](./docs/RELEASE_v114_v111.md).
 
 ---
 
 ## Build matrix
 
-Both lanes are **manually triggered** (`workflow_dispatch`) and share:
+Both lanes are **manually triggered** (`workflow_dispatch`) and every upstream is
+**pinned to a commit**, because unpinned upstreams have broken this project
+several times.
 
-- **Source:** `cctv18/android_kernel_common_oneplus_sm8750` @ `oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118`
-- **Toolchain:** CCTV18 prebuilt **LLVM/Clang 18** (`LLVM-Clang18-r510928`) + build‑tools
-- **SUSFS:** `cctv18/susfs4oki` @ `oki-android15-6.6` (single source — no mixed SUSFS trees)
-- **Packaging:** [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3), boot detection fixed for the A/B `sun` layout
-- **Caching:** per‑lane `ccache` (zstd), restored across runs
+| Component | Source | Pin |
+|---|---|---|
+| Kernel | `cctv18/android_kernel_common_oneplus_sm8750` @ `oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118` | `2a4726b` (6.6.118) |
+| SUSFS — BakaSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) |
+| SUSFS — SukiSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) + SELinux helper patch |
+| BakaSU driver | `Baka-SU/BakaSU` `main` | `d7260ca` |
+| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `0af2cf9` + UAPI 5 / manager / static-key repairs |
+| Build assets | `cctv18/oppo_oplus_realme_sm8750` | `21db9e7` |
+| Packaging | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `020dfec` |
+| Toolchain | CCTV18 prebuilt LLVM/Clang 18 (`r510928`) | release tag |
+
+> **Keep driver and SUSFS paired.** Both defaults use `3f6aae5`. SukiSU's exact
+> `0af2cf9` / `3f6aae5` pair receives the kernel SELinux helper wrappers and
+> retains its policy-query guard. Upstream's alternative `2d1de62` / `2919a9a`
+> pair retains its hook-enabled path. BakaSU uses its own SELinux hiding.
+> Both workflows check the driver/SUSFS generation before applying patches.
 
 ### Key inputs (set them when you press *Run workflow*)
 
-| Input | What it does | Sensible default |
+| Input | What it does | Default |
 |---|---|---|
 | `profile` | `stock_daily` / `stock_plus` / `minimal_safe` / `debug_only` | `stock_daily` |
-| root ref | `sukisu_ref` / `resukisu_ref` | **pinned commits** (see “Why the root refs are pinned”) |
+| `sukisu_ref` / `resukisu_ref` | Root driver commit (keep paired with `susfs_ref`) | pinned commit |
 | `sukisu_driver_version` | Latest official stable Manager versionCode or a compatibility value | `auto` (resolved at build time) |
-| `SUSFS` / `susfs_enable` | Enable CCTV18 SUSFS | On |
-| `susfs_patch_policy` | `strict` / `audited_cctv18` / `native_cctv18` | `audited_cctv18` |
-| `hook_mode` | Hook target (inline SUSFS vs. auto/kprobe) | `inline_susfs` / `cctv18_susfs_auto` |
-| `kernel_suffix` / `kernel_name` | Stock‑mimic `LOCALVERSION` (controls `uname -r`) | stock‑like string |
+| `susfs_ref` | SUSFS commit | pinned commit |
+| `SUSFS` | Enable CCTV18 SUSFS | On |
+| `susfs_patch_policy` | `audited_cctv18` / `strict` / `native_cctv18` | `audited_cctv18` |
+| `hook_mode` | Hook target (inline SUSFS vs. auto/test modes) | `inline_susfs` |
+| `kpm_enable` | Kernel‑side KPM (SukiSU only; BakaSU has none) | SukiSU: on · BakaSU: off |
+| `kernel_suffix` | Stock‑mimic `LOCALVERSION` (controls `uname -r`) | ColorOS 17 CN stock value |
+| `kernel_name` | Display banner shown by the flasher | lane name |
 | `optimise` | `O2` (stable) or `O3` (test‑only) | `O2` |
-| `zram_comp` | Preferred ZRAM compressor | `lz4` |
-| `bbr` / `bbr_mode` | Compile in TCP BBR (selectable at runtime, not forced default) | **On / enabled** |
-| `proxy` / `better_net` | Netfilter / TTL / IP_SET options | On |
-| `adios`, `bbg`, `rekernel` | Optional CCTV18 patches (best‑effort, see note) | **On** |
-| `fengchi` / HMBIRD | Experimental scheduler | Off (stability) |
+| `zram_module` / `zram_comp` | ZRAM + LZ4/LZ4HC/ZSTD in config / preferred compressor | On / `lz4` |
+| `lz4_zram_patch` | Extra LZ4 ZRAM patch (touches kernel headers → KMI risk) | Off |
+| `bbr` | TCP BBR (`On` = available, `Default` = default congestion control) | On |
+| `proxy` | Netfilter extras (HL target/match, IP_SET) | On |
+| `adios` / `rekernel` / `bbg` | ADIOS I/O scheduler / Re:Kernel / Baseband‑Guard | On |
+| `fengchi` | FengChi/HMBIRD scheduler (experimental) | Off |
+| `BUILD_USER` / `BUILD_HOST` | `/proc/version` identity | `kleaf` / `build-host` (stock GKI) |
 | `clean_ccache` | Wipe ccache before building | false |
 
 ### SukiSU version dropdown
@@ -136,11 +163,15 @@ SukiSU or SUSFS source refs and does not establish firmware compatibility.
 See the [Manager compatibility decision](.agents/notes/implemented/bug-fix/2026-10-17-sukisu-uapi-manager-compatibility.md)
 for the source audit and successful repair build.
 
-> **Optional patches are best‑effort.** `adios`, `baseband_guard`, `rekernel`,
-> `fengchi`/HMBIRD etc. are applied **only if** a matching CCTV18 patch exists
-> and dry‑runs cleanly; otherwise the step logs a warning and skips, so the build
-> still completes. Don't assume a toggle is "on" in the final Image — confirm in
-> the run's `_ox_debug/optional-patches.log` and `config-scan.txt`.
+> **Feature inputs:** ADIOS and Re:Kernel use the existing kernel sources;
+> Baseband‑Guard installs its pinned LSM source. FengChi/HMBIRD and extra
+> compression patches remain best-effort. Check `_ox_debug/optional-patches.log`
+> and `config-scan.txt` for each build's actual result.
+
+> **Moving ROMs?** `kernel_suffix` defaults to the ColorOS 17 CN stock value
+> `android15-8-g9bc34d5b0c79-abogki537459655-4k`. For ColorOS 16 use
+> `android15-8-g93e223c276e7-abogki500782043-4k`. The kernel source is the same
+> 6.6.118 for both.
 
 ### Outputs
 
@@ -148,32 +179,35 @@ Each run uploads one artifact containing:
 
 - `Image_OP13_…` — raw kernel image (+ `.sha256`)
 - `AK3_OP13_…_FLASH_THIS.zip` — AnyKernel3 flashable ZIP (+ `.sha256`)
-- `OP13_ZRAM_LZ4_Tuner_…zip` — optional, separate ZRAM/LZ4 tuner module
-- `_ox_debug/` — logs, final `.config`, rejects, UTS release, patch audit
+- `_ox_debug/` — logs, final `.config`, patch audit and check results:
+  - `pairing.txt` — must say `pairing: OK`
+  - `susfs-config-audit.txt` — every requested SUSFS option is `=y`
+  - `cve-status.txt`, `sec-posix-timers.txt` — security fixes applied
 
 ---
 
 ## Features
 
-What each lane reliably provides:
-
 - **GKI 2.0** packaging as an AnyKernel3 flashable ZIP
-- **Root:** ReSukiSU **or** SukiSU Ultra **or** KernelSU‑Next (one per lane)
-- **SUSFS** (CCTV18 `susfs4oki`) with inline hook by default — SUS path / mount /
-  kstat, try‑umount, `uname` spoof, cmdline/bootconfig spoof, open‑redirect, sus‑map
-- **ZRAM** with LZ4 / LZ4HC / ZSTD kernel support and a preferred compressor
-- **Netfilter extras** when `proxy`/`better_net` is on: TTL/HL target + match, IP_SET
-- **KPM** support on the SukiSU/ReSukiSU lanes (kernel support only — no modules bundled)
-- **Stock‑mimic `uname -r`** via `kernel_suffix`, so the build looks stock to apps
+- **Root:** BakaSU **or** SukiSU Ultra (one per lane)
+- **SUSFS v2.3.0** (CCTV18 `susfs4oki`) with inline hook — SUS path / mount /
+  kstat / map, `uname` spoof, cmdline/bootconfig spoof, open‑redirect, KSU/SUSFS
+  symbol hiding (SUSFS logging is off to save battery)
+- **SELinux context hiding** — BakaSU's own implementation, or SukiSU builtin's
+  with the matching SUSFS pair
+- **Stock‑mimic identity** — `uname -r` matches ColorOS 17 CN exactly (no trailing
+  `+`), and `/proc/version` reports the stock `kleaf@build-host`
+- **ADIOS** I/O scheduler (set as default), **Re:Kernel**, **Baseband‑Guard** LSM
+- **ZRAM** with LZ4 / LZ4HC / ZSTD, **TCP BBR**, **NTSYNC**, netfilter extras
+- **Security fixes** on top of CCTV18's source: CVE‑2026‑43499 (rtmutex) and the
+  6.6‑stable posix‑cpu‑timers use‑after‑free fix
+- **KPM** support on the SukiSU lane, including final-Image KernelPatch injection
+  and standalone/AnyKernel3 Image consistency checks; no modules bundled
 
-Opt‑in / best‑effort (only if the CCTV18 patch applies cleanly): **ADIOS** I/O
-scheduler, **Baseband‑Guard**, **Re:Kernel**, **FengChi/HMBIRD** scheduler,
-**NTSYNC**, **BBR**.
-
-> **Hiding note:** the SukiSU stable lane intentionally **skips** the SUSFS
-> SELinux‑policy hiding blocks (`69_hide_stuff` and the policy‑query wrappers)
-> because they failed final link against the current SukiSU builtin. Core SUSFS +
-> inline hook stay enabled; SELinux‑policy hiding is reduced. See `docs/REVIEW.md`.
+**Companion module:** **X1 Kernel Manager** (`ox_op13_kernel_manager`) — WebUI
+for profiles, ZRAM, charging and live stats, plus the SUSFS privacy layer (path /
+map / uname / mount hiding) and an attestation preflight. Runtime tuning lives in
+the module rather than the kernel, to stay within GKI 2.0 KMI limits.
 
 ---
 
@@ -183,13 +217,13 @@ scheduler, **Baseband‑Guard**, **Re:Kernel**, **FengChi/HMBIRD** scheduler,
 > **instability**. You are responsible for what you flash. If you can't recover
 > from a bootloop, **don't flash**.
 
-**Back up before flashing.** In recovery, back up `boot` and `init_boot`
+**Back up before flashing.** Back up `boot` and `init_boot`
 (and `vbmeta` if your setup uses it).
 
 **If you bootloop:**
-1. Reboot to recovery.
-2. Restore your `boot` / `init_boot` backup. (If recovery is broken, flash the
-   stock `boot.img`, then reboot to recovery.)
+1. Reboot to recovery / fastboot.
+2. Restore your `boot` / `init_boot` backup (or flash the stock `boot.img` for
+   your exact ColorOS build).
 3. Reboot.
 
 ---
@@ -198,81 +232,95 @@ scheduler, **Baseband‑Guard**, **Re:Kernel**, **FengChi/HMBIRD** scheduler,
 
 1. Download the correct `AK3_OP13_…_FLASH_THIS.zip` from **Releases** (or the
    **Actions** run artifact).
-2. Flash with a kernel flasher or your KernelSU/SukiSU/Magisk manager's
-   AnyKernel3 flasher.
+2. Flash it with a kernel flasher or your root manager's AnyKernel3 flasher.
 3. Reboot.
-4. Install/update the matching SUSFS module for your root manager.
+4. Install the matching manager APK — **BakaSU:** latest BakaSU manager ·
+   **SukiSU:** the release recorded in the build summary.
+5. Optional: install **X1 Kernel Manager**. On BakaSU, mount hiding needs the
+   `ksu_susfs` binary (from the susfs4ksu module); SukiSU v4.2.0's `ksud` has it
+   built in.
 
-**Force LZ4 ZRAM (optional):** flash the separate `OP13_ZRAM_LZ4_Tuner` module,
-reboot, and it prefers LZ4 when supported. It is safe by design — it will **not**
-reset ZRAM if it's already active.
-
-> Switching lanes (e.g. SukiSU → ReSukiSU)? Reinstall the SUSFS module afterwards to
-> clear stale module state.
+> Switching lanes (e.g. SukiSU → BakaSU)? Reinstall your SUSFS/manager modules
+> afterwards to clear stale state.
 
 ---
 
 ## Verify after flashing
 
 ```sh
-# Kernel version / stock-mimic uname
-uname -a
+# Stock-mimic uname — should end in "-4k" with no trailing "+"
+uname -r
+# expected: 6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k
+
+# SUSFS kernel options
+su -c 'zcat /proc/config.gz | grep -E "^CONFIG_KSU_SUSFS(_SUS_PATH|_SUS_MOUNT|_SUS_KSTAT|_SUS_MAP|_SPOOF_UNAME)?="'
+
+# ADIOS scheduler, Re:Kernel, Baseband-Guard
+su -c 'zcat /proc/config.gz | grep -E "^CONFIG_(MQ_IOSCHED_ADIOS|REKERNEL|BBG)="'
 
 # ZRAM + active compressor
 su -c 'cat /sys/block/zram0/comp_algorithm 2>/dev/null; cat /proc/swaps'
 
-# SUSFS kernel flags
-su -c 'zcat /proc/config.gz | grep -E "CONFIG_KSU(_SUSFS)?(_SUS_PATH|_SUS_MOUNT|_TRY_UMOUNT|_SPOOF_UNAME)?="'
+# SukiSU lane: manager crowned early in boot
+su -c 'dmesg | grep -E "scanning manager|Crowning manager"'
 ```
 
 ---
 
 ## Troubleshooting
 
+- **`su` fails in Termux/adb with `cannot execute: required file not found`, but
+  apps still get root** — driver and SUSFS are from different generations. Use
+  the pinned defaults; check `_ox_debug/pairing.txt`.
+- **SukiSU: root unavailable / App Profile writes fail** — compare the installed
+  Manager release and UAPI with the build summary. Rebuild using `auto` for its
+  interface check; explicit numeric selections are recorded as `manual-unchecked`.
+- **SukiSU: "Failed to grant Root!" until the manager is restarted** — fixed in
+  v114 (early manager scan at post‑fs‑data). Update the kernel.
 - **SUSFS module "operation not supported" / `0x555e1`** — reinstall the SUSFS
   module after flashing; if you had a different one before, uninstall it, reboot,
   then install the correct one.
-- **No `zram.ko`** — ZRAM is built‑in here; check `/proc/swaps` and
-  `/sys/block/zram0/comp_algorithm` instead of looking for a `.ko`.
-- **Bootloop** — restore `boot` / `init_boot`, then return to the `stock_daily`
+- **No `zram.ko`** — ZRAM is built in; check `/proc/swaps` and
+  `/sys/block/zram0/comp_algorithm`.
+- **Bootloop** — restore `boot` / `init_boot`, return to the `stock_daily`
   profile and re‑introduce options one at a time.
-- **A toggle didn't take effect** — open the run's `_ox_debug/config-scan.txt`
-  and `optional-patches.log`; best‑effort patches skip if they don't apply.
+- **TEE / Soter attestation flagged by a detector** — expected on an unlocked
+  bootloader. The secure world learns the boot state from the boot chain; no
+  kernel or module can change that.
 
 ---
 
 ## Build it yourself
 
 Open **Actions → pick a lane → Run workflow**, choose your inputs, and download
-the artifact when it finishes. Start from `stock_daily` + `O2` + inline SUSFS for
-a stable result, then experiment from a fork.
+the artifact when it finishes. Start from `stock_daily` + `O2` + inline SUSFS with
+the pinned refs, then experiment from a fork. If you change a root ref, change
+`susfs_ref` with it — the pairing guard will stop a mismatched build.
 
 ### Maintenance utilities
 - **Clean Caches** (`Clean Caches.yml`) — purge `ccache-*` Actions caches.
 - **Cleanup CCache** (`clean-up.yml`) — bulk cache/run cleanup with filters.
-- **Lint Workflows** (`lint.yml`) — actionlint + yamllint + shellcheck on every
-  workflow change, so pipeline typos are caught before a build is queued.
+- **Lint Workflows** (`lint.yml`) — actionlint + yamllint on every workflow change.
 
 ### Portable composite action (advanced)
 `action.yml` is a separate, **device‑agnostic** builder that syncs sources with
 Google's `repo` tool (`manifest.xml`), pulls AnyKernel3/`kernel_patches` from
 TheWildJames + SUSFS from `simonpunk/susfs4ksu`, and applies a broad OnePlus
-performance/battery patch set. It is intended for forks/other devices and is
-**not** what the OP13 release lanes above use. See `docs/REVIEW.md` for details
-and a roadmap to unify the lanes.
+patch set. It is intended for forks/other devices and is **not** what the OP13
+release lanes above use. See `docs/REVIEW.md`.
 
 ---
 
 ## Credits
 
 [@cctv18](https://github.com/cctv18) ·
+[BakaSU](https://github.com/Baka-SU) ·
 [SukiSU‑Ultra](https://github.com/SukiSU-Ultra) ·
-[ReSukiSU](https://github.com/ReSukiSU) ·
-[KernelSU‑Next](https://github.com/KernelSU-Next) ·
 [@simonpunk (SUSFS)](https://gitlab.com/simonpunk/susfs4ksu) ·
 [@osm0sis (AnyKernel3)](https://github.com/osm0sis) ·
 [@mrcxlinux](https://github.com/mrcxlinux) ·
-[@WildKernels / @TheWildJames](https://github.com/WildKernels)
+[@WildKernels / @TheWildJames](https://github.com/WildKernels) ·
+[KernelSU‑Next](https://github.com/KernelSU-Next) (former lane)
 
 ---
 

@@ -1,3 +1,7 @@
+> **Historical diagnosis.** Current behavior depends on the driver/SUSFS pair;
+> see [`SELINUX_POLICY_HIDING.md`](./SELINUX_POLICY_HIDING.md). This fork's default
+> UAPI 5 SukiSU pair retains the policy-query guard; BakaSU uses its own hiding.
+
 # Known limitation: SUSFS SELinux policy hiding is NOT active
 
 **Applies to:** both lanes (SukiSU Ultra, ReSukiSU), all versions.

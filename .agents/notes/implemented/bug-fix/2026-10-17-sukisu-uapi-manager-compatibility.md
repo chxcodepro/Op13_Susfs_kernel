@@ -61,6 +61,19 @@ That decision remains responsible for Image transformation; the
 remains responsible for synchronized numeric choices. Neither decision alone
 establishes protocol compatibility.
 
+### Upstream v114 integration
+
+The merged workflow retains the repaired `0af2cf9` / `3f6aae5` default pair,
+auto/manual Manager version selection, and the KPM final-Image pipeline. It
+adopts upstream's post-fs-data manager scan, posix-cpu-timers security patch,
+source-present ADIOS/Re:Kernel configuration, pinned Baseband Guard install,
+flasher branding, and v114 artifact names. BakaSU uses upstream's v111 names.
+
+The helper patch matches the literal repaired SUSFS commit independently of
+upstream's `VERIFIED_SUSFS=2919a9a`. Only upstream's alternative `2d1de62` /
+`2919a9a` pair enables policy-query hooks automatically. This preserves the
+default repair's guard while retaining the upstream pair's existing path.
+
 ## Alternatives considered
 
 - Changing only the UAPI number removes the banner cheaply but leaves scoped
@@ -69,8 +82,18 @@ establishes protocol compatibility.
   builtin/SUSFS integration and requires a larger hook/build-layout migration.
 - Downgrading Manager avoids changing the boot image, but forfeits the user's
   chosen v4.2.1 Manager and does not correct future auto-version mismatches.
+- Replacing the fork defaults with upstream's `2d1de62` / `2919a9a` and fixed
+  40900 version avoids the helper backport, but drops the repaired UAPI 5 and
+  automatic Manager selection. The merge keeps that pair as an explicit option.
 
 ## Verification
+
+The 2026-10-27 integration receives merge-diff and source-pair review, including
+YAML parsing of the changed workflows and composite action. All original build
+steps and the eight local patch/script/sync files are retained. The pinned
+builtin's post-fs-data function has the observer anchor and already uses
+track_throne elsewhere. Tests and a fresh kernel build remain unrun, per the
+user's instruction; the evidence below describes the earlier UAPI repair.
 
 The eight focused UAPI tests pass, including rejection of driver UAPI 2 against
 Manager UAPI 5 and preservation of explicit legacy manual mode. The 12 version
