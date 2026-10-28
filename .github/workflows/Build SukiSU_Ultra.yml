@@ -104,7 +104,7 @@ on:
         options: ["On", "Off"]
         default: "Off"
       zram_module:
-        description: "启用内核 ZRAM 及 LZ4/LZ4HC/ZSTD 配置（推荐）。运行时压缩算法与启停调优由 X1 Kernel Manager 模块处理。"
+        description: "启用额外 LZ4/LZ4HC/ZSTD 配置。ZRAM/ZSMALLOC 保持模块化，兼容 ColorOS 原厂 HybridSwap；运行参数由系统或调优模块管理。"
         required: true
         type: choice
         options: ["On", "Off"]
@@ -126,7 +126,7 @@ on:
         required: true
         type: choice
         options: ["On", "Off"]
-        default: "On"
+        default: "Off"
       rekernel:
         description: "启用源码内置的 Re:Kernel，供后台冻结应用使用。"
         required: true
@@ -1369,7 +1369,12 @@ jobs:
 
           # Mountify / Magic Mount friendly tmpfs support.
           # v114: enable the source-present features detected in the optional stage
-          if [ "${OX_EN_ADIOS:-0}" = "1" ]; then set_y CONFIG_MQ_IOSCHED_ADIOS; set_y CONFIG_MQ_IOSCHED_DEFAULT_ADIOS; fi
+          if [ "${OX_EN_ADIOS:-0}" = "1" ]; then
+            set_y CONFIG_MQ_IOSCHED_ADIOS
+            set_y CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
+          else
+            set_n CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
+          fi
           if [ "${OX_EN_REKERNEL:-0}" = "1" ]; then set_y CONFIG_REKERNEL; fi
           if [ "${OX_EN_BBG:-0}" = "1" ]; then
             set_y CONFIG_BBG
@@ -1399,11 +1404,12 @@ jobs:
               ;;
           esac
 
+          set_m CONFIG_ZRAM
+          set_m CONFIG_ZSMALLOC
+
           if [ "${{ inputs.zram_module }}" = "On" ]; then
-            echo "==> Enabling ZRAM + LZ4/LZ4HC/ZSTD config support"
+            echo "==> Keeping vendor-compatible modular ZRAM with LZ4/LZ4HC/ZSTD support"
             for opt in \
-              CONFIG_ZRAM \
-              CONFIG_ZSMALLOC \
               CONFIG_CRYPTO_LZ4 \
               CONFIG_CRYPTO_LZ4HC \
               CONFIG_CRYPTO_ZSTD \
@@ -1523,6 +1529,13 @@ jobs:
           make "${MAKE_ARGS[@]}" olddefconfig
 
           cp -f out/.config "$GITHUB_WORKSPACE/_ox_debug/final.config"
+
+          for opt in CONFIG_ZRAM CONFIG_ZSMALLOC; do
+            if ! grep -qx "${opt}=m" out/.config; then
+              echo "::error::${opt}=m is required for ColorOS vendor HybridSwap compatibility."
+              exit 1
+            fi
+          done
 
           echo "==> Final SukiSU/SUSFS inline hook audit" | tee "$GITHUB_WORKSPACE/_ox_debug/hook-mode-audit.txt"
           {
@@ -1799,27 +1812,6 @@ jobs:
           else
             echo "::warning::Could not detect AK3 boot-partition variable convention in ak3-core.sh. Flashing may fail; inspect _ox_debug/anykernel3_commit.txt."
           fi
-          # --- Bundle a best-effort RAM Expansion fix module into the AK3 zip ---
-          mkdir -p ak3_work/ramfix
-          cat > ak3_work/ramfix/module.prop <<'RAMFIXPROP'
-          id=op13_ram_expansion_fix
-          name=OP13 RAM Expansion Fix
-          version=v1
-          versionCode=1
-          author=ox1d3x3
-          description=Restores OnePlus RAM Expansion (extended RAM) under root by re-asserting persist.sys.oplus.nandswap.condition on each boot. Bundled with the kernel.
-          RAMFIXPROP
-          cat > ak3_work/ramfix/service.sh <<'RAMFIXSVC'
-          #!/system/bin/sh
-          MODDIR=${0%/*}
-          until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 2; done
-          sleep 8
-          resetprop persist.sys.oplus.nandswap.condition true 2>/dev/null || setprop persist.sys.oplus.nandswap.condition true 2>/dev/null || true
-          for n in /sys/block/zram0/hybridswap_dev_life /sys/block/zram*/hybridswap_dev_life; do
-            [ -e "$n" ] && echo 1 > "$n" 2>/dev/null || true
-          done
-          RAMFIXSVC
-          chmod 0755 ak3_work/ramfix/service.sh
           rm -rf ak3_work/.git ak3_work/.github ak3_work/README.md || true
           cp -f artifacts/Image_OP13_SukiSUUltra_CCTV18_inline_stocklike_v114 ak3_work/Image
 
@@ -1944,18 +1936,13 @@ jobs:
           fi
 
           ui_print ' '
-          # --- OX RAM Expansion auto-install (best effort; needs decrypted /data) ---
-          if [ -d /data/adb/modules ] && [ -d "$home/ramfix" ]; then
-          ui_print ' Installing bundled RAM Expansion fix...'
           RFM=/data/adb/modules/op13_ram_expansion_fix
-          mkdir -p "$RFM"
-          cp -f "$home/ramfix/module.prop" "$RFM/module.prop" 2>/dev/null
-          cp -f "$home/ramfix/service.sh" "$RFM/service.sh" 2>/dev/null
-          chmod 0755 "$RFM/service.sh" 2>/dev/null
-          rm -f "$RFM/disable" "$RFM/remove" "$RFM/update" 2>/dev/null
-          ui_print ' RAM Expansion fix installed (applies after reboot).'
-          else
-          ui_print ' RAM Expansion: /data not mounted - use X1 Kernel Manager instead.'
+          if [ -d "$RFM" ]; then
+            if touch "$RFM/disable"; then
+              ui_print ' Legacy RAM Expansion property override disabled.'
+            else
+              ui_print ' Disable op13_ram_expansion_fix in your root manager.'
+            fi
           fi
           ui_print ' Reboot Your System '
           ui_print ' '

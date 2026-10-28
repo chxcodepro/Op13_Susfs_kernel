@@ -123,11 +123,12 @@ several times.
 | `kernel_suffix` | Stock‑mimic `LOCALVERSION` (controls `uname -r`) | ColorOS 17 CN stock value |
 | `kernel_name` | Display banner shown by the flasher | lane name |
 | `optimise` | `O2` (stable) or `O3` (test‑only) | `O2` |
-| `zram_module` / `zram_comp` | ZRAM + LZ4/LZ4HC/ZSTD in config / preferred compressor | On / `lz4` |
+| `zram_module` / `zram_comp` | Extra LZ4/LZ4HC/ZSTD support / generic module's preferred compressor; ZRAM and ZSMALLOC stay modular | On / `lz4` |
 | `lz4_zram_patch` | Extra LZ4 ZRAM patch (touches kernel headers → KMI risk) | Off |
 | `bbr` | TCP BBR (`On` = available, `Default` = default congestion control) | On |
 | `proxy` | Netfilter extras (HL target/match, IP_SET) | On |
-| `adios` / `rekernel` / `bbg` | ADIOS I/O scheduler / Re:Kernel / Baseband‑Guard | On |
+| `adios` | Make ADIOS the default I/O scheduler instead of retaining the firmware policy | Off |
+| `rekernel` / `bbg` | Re:Kernel / Baseband‑Guard | On |
 | `fengchi` | FengChi/HMBIRD scheduler (experimental) | Off |
 | `BUILD_USER` / `BUILD_HOST` | `/proc/version` identity | `kleaf` / `build-host` (stock GKI) |
 | `clean_ccache` | Wipe ccache before building | false |
@@ -202,8 +203,8 @@ Each run uploads one artifact containing:
   with the matching SUSFS pair
 - **Stock‑mimic identity** — `uname -r` matches ColorOS 17 CN exactly (no trailing
   `+`), and `/proc/version` reports the stock `kleaf@build-host`
-- **ADIOS** I/O scheduler (set as default), **Re:Kernel**, **Baseband‑Guard** LSM
-- **ZRAM** with LZ4 / LZ4HC / ZSTD, **TCP BBR**, **NTSYNC**, netfilter extras
+- Optional **ADIOS** default I/O scheduler, **Re:Kernel**, **Baseband‑Guard** LSM
+- **Vendor-compatible modular ZRAM** with LZ4 / LZ4HC / ZSTD support, **TCP BBR**, **NTSYNC**, netfilter extras
 - **Security fixes** on top of CCTV18's source: CVE‑2026‑43499 (rtmutex) and the
   6.6‑stable posix‑cpu‑timers use‑after‑free fix
 - **KPM** support on the SukiSU lane, including final-Image KernelPatch injection
@@ -285,8 +286,14 @@ su -c 'dmesg | grep -E "scanning manager|Crowning manager"'
 - **SUSFS module "operation not supported" / `0x555e1`** — reinstall the SUSFS
   module after flashing; if you had a different one before, uninstall it, reboot,
   then install the correct one.
-- **No `zram.ko`** — ZRAM is built in; check `/proc/swaps` and
-  `/sys/block/zram0/comp_algorithm`.
+- **RAM Expansion unavailable** — both lanes keep `CONFIG_ZRAM=m` and
+  `CONFIG_ZSMALLOC=m` so ColorOS can load its vendor HybridSwap modules.
+  Check `/sys/block/zram0/hybridswap_core_enable`, `/proc/swaps`, and
+  `persist.sys.oplus.nandswap.err`. Error `1004` means the required kernel
+  interface is missing. The stock driver controls runtime compression and
+  expansion size. New packages stop bundling the property-override module and
+  disable an existing `op13_ram_expansion_fix` when its directory is accessible
+  during flashing; if `/data` is unavailable, disable that module in the root manager.
 - **Bootloop** — restore `boot` / `init_boot`, return to the `stock_daily`
   profile and re‑introduce options one at a time.
 - **TEE / Soter attestation flagged by a detector** — expected on an unlocked
