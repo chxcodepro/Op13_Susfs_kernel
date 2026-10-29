@@ -14,14 +14,17 @@ Numeric equality conceals the incompatible interface generation.
 The default builtin driver is pinned to upstream
 [ce75122](https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/ce75122bec7423e0f1fa06e3e9a174085c5231ab).
 It includes the real symbol-lookup
-ioctl, preinit implementation and UAPI 6 information flags. This pin precedes
+ioctl, preinit sources and UAPI 6 information flags. This pin precedes
 the later priority-UID SUSFS and KPM bridge migrations, keeping this change
 focused on the Manager interface. CCTV18 SUSFS remains pinned to 3f6aae5.
 
 A narrow driver patch preserves the static_key_true ABI expected by that
 CCTV18 tree. Both the getter/setter and the non-SUSFS read use the static key.
-The final linked-symbol audit also covers the new pin. Preinit sources cause
-the build to install kernel UAPI headers before compiling the embedded runner.
+The final linked-symbol audit also covers the new pin. The initial revision
+exported UAPI headers for the embedded runner. The reported boot failure and
+incomplete PREINIT wiring are addressed by the later
+[startup-safety decision](2026-10-28-sukisu-startup-safety.md), which owns that
+optional capability and the new mount-hiding path.
 
 Numeric Manager selections resolve an official stable release by its APK
 versionCode and compare the actual Manager header with the driver. Unknown
@@ -53,7 +56,8 @@ HybridSwap, firmware I/O defaults, KPM Image transformation and SUSFS guards
 remain in place. Numeric mismatches stop before kernel compilation.
 
 Patch applicability, source contracts, Python/YAML syntax and changed shell
-blocks receive static review. The user requests source push only: kernel
-compilation, runtime acceptance, phone flashing and reboot remain unperformed.
+blocks receive static review. The initial task requested source push only.
+The user later built run 40794283862 and reported launcher loops followed by
+a full reboot; runtime acceptance failed, leading to the startup-safety repair.
 The added regression fixtures document UAPI 5/6 mismatches, numeric matching,
 release filtering/pagination and preserved legacy calls; no test suite is run.

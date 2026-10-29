@@ -1,3 +1,48 @@
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 8492b9c..162186c 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -20,40 +20,7 @@ endif
+
+ MDIR    := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+-# ===== preinit runner =====
+-KSU_UAPI_INC := $(objtree)/usr/include
+-ifneq ($(wildcard $(KSU_UAPI_INC)/linux/unistd.h),)
+-ksu-y += preinit/preinit.o preinit/blob.o
+-
+-KSU_RUNNER_CFLAGS := $(CLANG_FLAGS) -std=gnu11 -Os -Wall \
+-	-nostdinc -isystem $(shell $(CC) -print-file-name=include) \
+-	-I$(KSU_KERNEL_DIR)/preinit/runner/nolibc -I$(KSU_UAPI_INC) \
+-	-I$(KSU_KERNEL_DIR)/include \
+-	-ffreestanding -fno-stack-protector -fno-pic -fno-pie \
+-	-fno-asynchronous-unwind-tables -fno-unwind-tables \
+-	-ffunction-sections -fdata-sections
+-
+-quiet_cmd_ksu_runner = RUNNER  $@
+-      cmd_ksu_runner = $(CC) $(KSU_RUNNER_CFLAGS) -c -o $@.o $< && \
+-		$(LD) -static -nostdlib -e _start --gc-sections -s -o $@ $@.o && \
+-		rm -f $@.o
+-
+-$(obj)/preinit/runner.elf: $(KSU_KERNEL_DIR)/preinit/runner/runner.c \
+-		$(wildcard $(KSU_KERNEL_DIR)/preinit/runner/nolibc/*.h \
+-			   $(KSU_KERNEL_DIR)/preinit/runner/nolibc/sys/*.h \
+-			   $(KSU_KERNEL_DIR)/include/uapi/*.h) FORCE
+-	$(call if_changed,ksu_runner)
+-
+-targets += preinit/runner.elf
+-
+-$(obj)/preinit/blob.o: $(obj)/preinit/runner.elf
+-asflags-y += -DKSU_PREINIT_RUNNER_BIN=\"$(abspath $(obj)/preinit/runner.elf)\"
+-
+-else
+-$(warning -- KernelSU: $(KSU_UAPI_INC) not found, preinit disabled)
+ ccflags-y += -DKSU_NO_PREINIT
+-endif
+-# ===== end preinit runner =====
+
+ REPO_OWNER  := SukiSU-Ultra
+ REPO_NAME   := SukiSU-Ultra
 diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
 index f458e56..95f8ef4 100644
 --- a/kernel/feature/sucompat.c
@@ -63,3 +108,46 @@ index 4bc7437..576d01c 100644
 -#endif
 \ No newline at end of file
 +#endif
+diff --git a/kernel/hook/lsm_hook.c b/kernel/hook/lsm_hook.c
+index 4990551..0c303ba 100644
+--- a/kernel/hook/lsm_hook.c
++++ b/kernel/hook/lsm_hook.c
+@@ -183,9 +183,6 @@ static struct security_hook_list ksu_hooks[] = {
+ #ifndef CONFIG_KSU_SUSFS
+     LSM_HOOK_INIT(task_fix_setuid, ksu_task_fix_setuid),
+ #endif
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+-    LSM_HOOK_INIT(file_open, ksu_mount_hide_file_open),
+-#endif
+ };
+
+ void __init ksu_lsm_hook_init(void)
+diff --git a/kernel/ksu_main.c b/kernel/ksu_main.c
+index 4465240..b90919f 100644
+--- a/kernel/ksu_main.c
++++ b/kernel/ksu_main.c
+@@ -35,7 +35,6 @@
+ #include "feature/kernel_umount.h"
+ #include "feature/sucompat.h"
+ #include "feature/sulog.h"
+-#include "feature/mount_hide.h"
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ #include "feature/selinux_hide.h"
+ #endif
+@@ -116,7 +115,6 @@
+ #include "feature/selinux_hide.c"
+ #endif
+ #include "feature/shell_su_adb_only.c"
+-#include "feature/mount_hide.c"
+ #include "runtime/ksud.c"
+
+ #include "sulog/event.c"
+@@ -191,8 +189,6 @@ int __init kernelsu_init(void)
+
+     ksu_kernel_umount_init();
+
+-	ksu_mount_hide_init();
+-
+     ksu_allowlist_init();
+
+     ksu_dynamic_manager_load();

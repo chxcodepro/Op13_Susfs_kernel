@@ -67,6 +67,13 @@ CCTV18 OP13 source, toolchain and SUSFS tree:
 > The earlier UAPI 5 pair remains selectable with driver `0af2cf9` and Manager
 > v4.2.1 / 40994.
 
+> [!WARNING]
+> **Startup regression:** build [40794283862](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/40794283862)
+> (`v114-17`) received a launcher/reboot failure report. New source removes the
+> default-deny `mount_hide` hook and disables unwired PREINIT support while
+> retaining UAPI 6. This is a source-level repair candidate awaiting a new build
+> and phone validation; the existing `v114-17` archive remains affected.
+
 > **About "android15" in the version string.** `uname -r` contains
 > `android15-8` on **stock ColorOS 17 too** — it names the GKI kernel branch
 > (`android15-6.6`), not the Android version. OnePlus ships the 6.6 GKI kernel on
@@ -99,13 +106,14 @@ several times.
 | SUSFS — BakaSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) |
 | SUSFS — SukiSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) + driver static-key ABI patch |
 | BakaSU driver | `Baka-SU/BakaSU` `main` | `d7260ca` |
-| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `ce75122` (native UAPI 6) + static-key ABI repair |
+| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `ce75122` (native UAPI 6) + ABI/startup-safety repair |
 | Build assets | `cctv18/oppo_oplus_realme_sm8750` | `21db9e7` |
 | Packaging | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `020dfec` |
 | Toolchain | CCTV18 prebuilt LLVM/Clang 18 (`r510928`) | release tag |
 
 > **Keep driver and SUSFS paired.** Both defaults use `3f6aae5`. The new SukiSU
-> `ce75122` default keeps the static-key ABI repair and policy-query guard.
+> `ce75122` default keeps the static-key ABI repair and policy-query guard,
+> excludes the new `mount_hide` file-open filter and reports PREINIT unsupported.
 > The legacy `0af2cf9` / `3f6aae5` pair also receives its kernel SELinux helper
 > wrappers. Upstream's alternative `2d1de62` / `2919a9a`
 > pair retains its hook-enabled path. BakaSU uses its own SELinux hiding.

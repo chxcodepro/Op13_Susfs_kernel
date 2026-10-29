@@ -486,7 +486,21 @@ jobs:
             patch_file="$GITHUB_WORKSPACE/.github/patches/sukisu-builtin-uapi6-susfs.patch"
             git -C "$source_dir" apply --check "$patch_file"
             git -C "$source_dir" apply "$patch_file"
-            echo "Applied CCTV18 static-key ABI compatibility to native UAPI 6 $actual_ref"
+            if grep -q 'mount_hide' "$source_dir/kernel/ksu_main.c" || grep -q 'ksu_mount_hide_file_open' "$source_dir/kernel/hook/lsm_hook.c"; then
+              echo "::error::The incompatible mount_hide startup path remains registered."
+              exit 1
+            fi
+            if ! grep -Fxq 'ccflags-y += -DKSU_NO_PREINIT' "$source_dir/kernel/Makefile"; then
+              echo "::error::Unwired PREINIT must remain disabled for this source pin."
+              exit 1
+            fi
+            {
+              echo "source=$actual_ref"
+              echo "mount_hide=not-compiled,not-registered"
+              echo "preinit=disabled,capability-not-advertised"
+              echo "sucompat=static-key"
+            } | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-startup-safety.txt"
+            echo "Applied native UAPI 6 startup and CCTV18 ABI compatibility to $actual_ref"
           else
             echo "Custom source ref: no pinned builtin compatibility patch applied."
           fi
@@ -1297,7 +1311,8 @@ jobs:
           echo "==> Generating gki_defconfig"
           make "${MAKE_ARGS[@]}" gki_defconfig
 
-          if [ -f drivers/kernelsu/preinit/preinit.c ]; then
+          actual_ref="$(git -C "$GITHUB_WORKSPACE/kernel_workspace/KernelSU" rev-parse HEAD)"
+          if [ "$actual_ref" != "ce75122bec7423e0f1fa06e3e9a174085c5231ab" ] && [ -f drivers/kernelsu/preinit/preinit.c ]; then
             make "${MAKE_ARGS[@]}" INSTALL_HDR_PATH="$PWD/out/usr" headers_install
             test -s out/usr/include/linux/unistd.h
           fi
