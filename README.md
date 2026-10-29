@@ -57,13 +57,15 @@ CCTV18 OP13 source, toolchain and SUSFS tree:
 | Lane | Workflow | Root solution | Manager APK | Pick it if… |
 |---|---|---|---|---|
 | **BakaSU** (Recommended) | `Build_ReSukiSU.yml` | [BakaSU](https://github.com/Baka-SU/BakaSU) (formerly ReSukiSU) | latest BakaSU manager | you want the daily driver — the most tested lane |
-| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) (`builtin` branch + UAPI 5 repair) | UAPI-compatible stable release selected at build time | you want SukiSU Ultra with KPM support |
+| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) (`builtin`, native UAPI 6) | v4.2.1-r2 / 41068, or a checked compatible stable release | you want SukiSU Ultra with KPM support |
 
 > [!IMPORTANT]
-> **SukiSU Manager pairing:** this fork retains the builtin UAPI 5 repair.
-> `auto` checks the selected stable Manager's UAPI before building. Install the
-> matching Manager release shown in the build summary; the earlier repair build
-> used v4.2.1 / 40994.
+> **SukiSU Manager pairing:** new builds default to native UAPI 6, targeting
+> v4.2.1-r2 / 41068. Both `auto` and numeric version choices check the actual
+> Manager interface before building. Existing release assets retain the pair
+> recorded in their own build summary; this source update requires a new build.
+> The earlier UAPI 5 pair remains selectable with driver `0af2cf9` and Manager
+> v4.2.1 / 40994.
 
 > **About "android15" in the version string.** `uname -r` contains
 > `android15-8` on **stock ColorOS 17 too** — it names the GKI kernel branch
@@ -95,16 +97,17 @@ several times.
 |---|---|---|
 | Kernel | `cctv18/android_kernel_common_oneplus_sm8750` @ `oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118` | `2a4726b` (6.6.118) |
 | SUSFS — BakaSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) |
-| SUSFS — SukiSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) + SELinux helper patch |
+| SUSFS — SukiSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) + driver static-key ABI patch |
 | BakaSU driver | `Baka-SU/BakaSU` `main` | `d7260ca` |
-| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `0af2cf9` + UAPI 5 / manager / static-key repairs |
+| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `ce75122` (native UAPI 6) + static-key ABI repair |
 | Build assets | `cctv18/oppo_oplus_realme_sm8750` | `21db9e7` |
 | Packaging | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `020dfec` |
 | Toolchain | CCTV18 prebuilt LLVM/Clang 18 (`r510928`) | release tag |
 
-> **Keep driver and SUSFS paired.** Both defaults use `3f6aae5`. SukiSU's exact
-> `0af2cf9` / `3f6aae5` pair receives the kernel SELinux helper wrappers and
-> retains its policy-query guard. Upstream's alternative `2d1de62` / `2919a9a`
+> **Keep driver and SUSFS paired.** Both defaults use `3f6aae5`. The new SukiSU
+> `ce75122` default keeps the static-key ABI repair and policy-query guard.
+> The legacy `0af2cf9` / `3f6aae5` pair also receives its kernel SELinux helper
+> wrappers. Upstream's alternative `2d1de62` / `2919a9a`
 > pair retains its hook-enabled path. BakaSU uses its own SELinux hiding.
 > Both workflows check the driver/SUSFS generation before applying patches.
 
@@ -114,7 +117,7 @@ several times.
 |---|---|---|
 | `profile` | `stock_daily` / `stock_plus` / `minimal_safe` / `debug_only` | `stock_daily` |
 | `sukisu_ref` / `resukisu_ref` | Root driver commit (keep paired with `susfs_ref`) | pinned commit |
-| `sukisu_driver_version` | Latest official stable Manager versionCode or a compatibility value | `auto` (resolved at build time) |
+| `sukisu_driver_version` | Latest official stable Manager or numeric versionCode; both check its UAPI | `auto` (resolved at build time) |
 | `susfs_ref` | SUSFS commit | pinned commit |
 | `SUSFS` | Enable CCTV18 SUSFS | On |
 | `susfs_patch_policy` | `audited_cctv18` / `strict` / `native_cctv18` | `audited_cctv18` |
@@ -279,8 +282,9 @@ su -c 'dmesg | grep -E "scanning manager|Crowning manager"'
   apps still get root** — driver and SUSFS are from different generations. Use
   the pinned defaults; check `_ox_debug/pairing.txt`.
 - **SukiSU: root unavailable / App Profile writes fail** — compare the installed
-  Manager release and UAPI with the build summary. Rebuild using `auto` for its
-  interface check; explicit numeric selections are recorded as `manual-unchecked`.
+  Manager release and UAPI with the build summary. Both `auto` and numeric
+  selections verify the interface; numeric builds record `manual-checked`.
+  The explicit pre-UAPI `6c13a06` / 40796 lane retains its legacy path.
 - **SukiSU: "Failed to grant Root!" until the manager is restarted** — fixed in
   v114 (early manager scan at post‑fs‑data). Update the kernel.
 - **SUSFS module "operation not supported" / `0x555e1`** — reinstall the SUSFS

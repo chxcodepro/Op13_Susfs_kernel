@@ -49,6 +49,7 @@ class DropdownTests(unittest.TestCase):
         self.assertIn('          - "40796"', updated)
         self.assertIn('        default: "auto"', updated)
         self.assertIn("当前已同步：41050", updated)
+        self.assertIn("auto/手动版本均校验接口", updated)
         self.assertNotIn("latest synced:", updated)
         self.assertEqual(sync.update_choices(updated, "41050"), updated)
 

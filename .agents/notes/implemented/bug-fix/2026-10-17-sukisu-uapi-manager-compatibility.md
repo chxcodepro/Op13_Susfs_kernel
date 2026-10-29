@@ -12,7 +12,7 @@ actual protocol mismatch, not evidence that the new boot image failed to load.
 
 ## Decision
 
-The workflow pins the official builtin driver to 0af2cf9cef7dc2239fa7ebb3f7898830a1087e26.
+The legacy UAPI 5 selection pins the official builtin driver to 0af2cf9cef7dc2239fa7ebb3f7898830a1087e26.
 It already implements scoped su-session file descriptors (UAPI 3) and the
 services-stage start/skip result (UAPI 5), but its header still declares 2 and
 omits the UAPI 4 bundled-LKM flag plumbing. The patch backports that upstream
@@ -124,7 +124,10 @@ artifacts/run-38944690920/OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v111-14/artifacts/
 Auto builds reject incompatible UAPI pairs rather than producing a misleading
 numeric version. The compatibility patches apply only to their exact pinned
 source pairs, so changing sources requires a deliberate compatibility review.
-Numeric manual selections keep their original contract and unchecked status.
+The no-tag verifier call remains available for legacy sources. The
+[native UAPI 6 decision](2026-10-28-sukisu-native-uapi6.md) owns the current
+default and the workflow's checked numeric Manager selections; the explicit
+pre-UAPI 6c13a06/40796 path remains selectable.
 
 The phone remains on its previous image; no flash or reboot is performed.
 Build and static checks do not replace the later, separately authorized phone

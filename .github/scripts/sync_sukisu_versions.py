@@ -60,7 +60,7 @@ def update_choices(source, version):
     if not re.search(r"(?m)^        type: choice$", block):
         raise ValueError("sukisu_driver_version is not a choice input")
     description = (
-        "auto：构建时获取官方最新稳定版并校验驱动接口；"
+        "auto/手动版本均校验接口，旧版配对见说明；"
         f"当前已同步：{version}。源码提交单独选择。"
     )
     block, descriptions = re.subn(
