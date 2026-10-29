@@ -38,12 +38,12 @@ on:
         type: string
         default: "ce75122bec7423e0f1fa06e3e9a174085c5231ab"
       sukisu_driver_version:
-        description: "auto/手动版本均校验接口，旧版配对见说明；当前已同步：41068。源码提交单独选择。"
+        description: "auto/手动版本均校验接口，旧版配对见说明；当前已同步：41100。源码提交单独选择。"
         required: true
         type: choice
         options:
           - auto
-          - "41068"
+          - "41100"
           - "40994"
           - "40900"
           - "40796"
