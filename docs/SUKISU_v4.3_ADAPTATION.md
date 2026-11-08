@@ -90,6 +90,15 @@ visibility; deleting it restores warnings when Manager restarts.
 
 ## Verification status
 
+The first two builds, [42471010836](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/42471010836)
+and [42471521043](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/42471521043),
+stop before compilation because the public Clang asset URL returns HTTP 504.
+The toolchain-download repair resolves both archive IDs from the same release
+tag and uses the official asset API with bounded curl retries. Its
+[decision record](../.agents/notes/implemented/bug-fix/2026-11-08-sukisu-toolchain-asset-api.md)
+preserves the evidence and download contract. The API serves a checked one-byte
+Clang range; complete archive transfer remains unverified.
+
 The backport is assembled from the upstream builtin patches against the exact
 repaired pin, with a small adaptation of the r1 SELinux-generation fix to retain
 the builtin's older-kernel branches. Review covers the changed handlers,

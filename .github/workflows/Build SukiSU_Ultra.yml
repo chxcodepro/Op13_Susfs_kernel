@@ -271,6 +271,8 @@ jobs:
 
       - name: "Sync kernel sources"
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           rm -rf kernel_workspace cctv18_assets _ox_debug artifacts ak3_work zram_tuner_work
@@ -303,14 +305,22 @@ jobs:
           rm -f common.zip
 
           echo "==> Downloading CCTV18 LLVM/Clang18 and build-tools"
-          aria2c -s16 -x16 -k1M --retry-wait=5 --max-tries=5 \
-            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/${CCTV18_TOOLCHAIN_RELEASE}/clang-r510928.zip" \
+          toolchain_api="https://api.github.com/repos/cctv18/oneplus_sm8650_toolchain"
+          release_json="$GITHUB_WORKSPACE/_ox_debug/toolchain-release.json"
+          curl_args=(-fL --retry 5 --retry-delay 5 --retry-max-time 300 --connect-timeout 15
+            -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl "${curl_args[@]}" -H "Accept: application/vnd.github+json" \
+            "$toolchain_api/releases/tags/$CCTV18_TOOLCHAIN_RELEASE" -o "$release_json"
+          clang_asset_id="$(jq -er '[.assets[] | select(.name == "clang-r510928.zip") | .id] | select(length == 1) | .[0] | numbers | select(. > 0)' "$release_json")"
+          tools_asset_id="$(jq -er '[.assets[] | select(.name == "build-tools.zip") | .id] | select(length == 1) | .[0] | numbers | select(. > 0)' "$release_json")"
+          curl "${curl_args[@]}" -H "Accept: application/octet-stream" \
+            "$toolchain_api/releases/assets/$clang_asset_id" \
             -o clang.zip
           unzip -q clang.zip -d clang18
           rm -f clang.zip
 
-          aria2c -s16 -x16 -k1M --retry-wait=5 --max-tries=5 \
-            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/${CCTV18_TOOLCHAIN_RELEASE}/build-tools.zip" \
+          curl "${curl_args[@]}" -H "Accept: application/octet-stream" \
+            "$toolchain_api/releases/assets/$tools_asset_id" \
             -o build-tools.zip
           unzip -q build-tools.zip
           rm -f build-tools.zip
