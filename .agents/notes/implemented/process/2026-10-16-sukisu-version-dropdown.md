@@ -13,7 +13,7 @@ could not see the latest numeric choice before starting a build.
 `sync-sukisu-versions.yml` reads the official latest stable release daily at
 10:23 Asia/Shanghai and on manual dispatch. A standard-library Python script
 updates only the SukiSU version input's description and choices, preserving
-`auto`, the current stable versionCode, and compatibility values `40994`,
+`auto`, the current stable versionCode, and compatibility values `41140`, `40994`,
 `40900`, and `40796`. A newer stable replaces the previous automatically tracked choice.
 No release change means no commit. API or schema failures leave the file alone.
 
@@ -22,6 +22,11 @@ Manager v4.2.1 / 40994 declares UAPI 5; the newer v4.2.1-r2 / 41068 declares 6.
 GitHub validates choice inputs and rejects a dispatch with HTTP 422 when 40994
 is missing. Keeping it in both the YAML and generator preserves the release
 build's supported Manager selection across daily refreshes.
+
+`41140` remains selectable for v4.3.0-r1 with the
+[v4.3 builtin backport](../feature/2026-11-08-sukisu-v430-extensions.md), alongside
+the current v4.3.0-r2 / 41150 choice. The generator preserves this fallback pair
+across scheduled refreshes; the new retention fixture receives source review only.
 
 All three build dispatch forms use Chinese descriptions while preserving input
 keys, choice values, source pins, and feature defaults. The generated version

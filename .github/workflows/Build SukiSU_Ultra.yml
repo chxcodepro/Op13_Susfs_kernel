@@ -33,7 +33,7 @@ on:
         options: [stock_daily, stock_plus, minimal_safe, debug_only]
         default: stock_daily
       sukisu_ref:
-        description: "默认 builtin ce75122 原生 UAPI 6，搭配 SUSFS 3f6aae5 和管理器 41068。auto/手动版本均校验接口。旧 UAPI 5 配对：0af2cf9 + 3f6aae5 + 40994。旧版40796兼容配对：6c13a0695a1115e1000c998872b66f4ff5b2f11e + 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a，保留预UAPI路径。"
+        description: "默认 builtin ce75122 + v4.3 扩展回移（版本信息自定义、扩展 ABI 2），搭配 SUSFS 3f6aae5 和管理器 41150。auto/手动版本均校验接口。旧 UAPI 5 配对：0af2cf9 + 3f6aae5 + 40994。旧版40796兼容配对：6c13a0695a1115e1000c998872b66f4ff5b2f11e + 83dcd81e7e13440e1b8b756dea4e8311e54f4c3a，保留预UAPI路径。"
         required: true
         type: string
         default: "ce75122bec7423e0f1fa06e3e9a174085c5231ab"
@@ -44,6 +44,7 @@ on:
         options:
           - auto
           - "41150"
+          - "41140"
           - "40994"
           - "40900"
           - "40796"
@@ -486,6 +487,10 @@ jobs:
             patch_file="$GITHUB_WORKSPACE/.github/patches/sukisu-builtin-uapi6-susfs.patch"
             git -C "$source_dir" apply --check "$patch_file"
             git -C "$source_dir" apply "$patch_file"
+            patch_file="$GITHUB_WORKSPACE/.github/patches/sukisu-builtin-v4.3-extensions.patch"
+            git -C "$source_dir" apply --check "$patch_file"
+            git -C "$source_dir" apply "$patch_file"
+            echo "SUKISU_BACKPORT=v4.3-extensions-r1-fixes" >> "$GITHUB_ENV"
             if grep -q 'mount_hide' "$source_dir/kernel/ksu_main.c" || grep -q 'ksu_mount_hide_file_open' "$source_dir/kernel/hook/lsm_hook.c"; then
               echo "::error::The incompatible mount_hide startup path remains registered."
               exit 1
@@ -500,7 +505,8 @@ jobs:
               echo "preinit=disabled,capability-not-advertised"
               echo "sucompat=static-key"
             } | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-startup-safety.txt"
-            echo "Applied native UAPI 6 startup and CCTV18 ABI compatibility to $actual_ref"
+            git -C "$source_dir" diff --stat | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-backport.txt"
+            echo "Applied native UAPI 6, v4.3 extensions and startup/CCTV18 repairs to $actual_ref"
           else
             echo "Custom source ref: no pinned builtin compatibility patch applied."
           fi
@@ -654,6 +660,10 @@ jobs:
           manager_uapi="$(jq -r '.manager_uapi // "manual-unchecked"' "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json")"
           echo "SUKISU_KERNEL_UAPI=$kernel_uapi" >> "$GITHUB_ENV"
           echo "SUKISU_MANAGER_UAPI=$manager_uapi" >> "$GITHUB_ENV"
+          extension_api="$(jq -r '.kernel_extension_api' "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json")"
+          version_spoof="$(jq -r '.kernel_version_spoof' "$GITHUB_WORKSPACE/_ox_debug/sukisu-uapi-compat.json")"
+          echo "SUKISU_EXTENSION_API=$extension_api" >> "$GITHUB_ENV"
+          echo "SUKISU_VERSION_SPOOF=$version_spoof" >> "$GITHUB_ENV"
 
           # Override only KSU_VERSION immediately before KSU_VERSION_FULL is evaluated.
           # Do not alter the selected source ref or its UAPI; this only fixes the numeric
@@ -717,6 +727,8 @@ jobs:
             printf -- '- Version source: %s\n' "$version_source"
             printf -- '- SukiSU source commit/ref: `%s`\n' "$actual_ref"
             printf -- '- Driver UAPI: `%s`; Manager UAPI: `%s`\n' "$kernel_uapi" "$manager_uapi"
+            printf -- '- Extension ABI: `%s`; version_spoof: `%s`\n' "$extension_api" "$version_spoof"
+            printf -- '- Backport: `%s`\n' "${SUKISU_BACKPORT:-custom-source}"
             echo '- Version selection does not update the SukiSU/SUSFS source refs.'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -1690,6 +1702,12 @@ jobs:
               END { if (!found || invalid) exit 1 }
             ' | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-sucompat-symbol.txt"
           fi
+          if [ "${SUKISU_VERSION_SPOOF:-false}" = "true" ]; then
+            llvm-readelf --symbols --wide out/vmlinux | awk '
+              $NF ~ /^ksu_extension_version_spoof_io($|\.)/ && $4 == "FUNC" { print; found = 1 }
+              END { if (!found) exit 1 }
+            ' | tee "$GITHUB_WORKSPACE/_ox_debug/sukisu-version-spoof-symbol.txt"
+          fi
 
           image="out/arch/arm64/boot/Image"
           if [ ! -s "$image" ]; then
@@ -1996,6 +2014,9 @@ jobs:
           SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}
           SukiSU kernel UAPI: ${SUKISU_KERNEL_UAPI:-unknown}
           SukiSU Manager UAPI: ${SUKISU_MANAGER_UAPI:-unknown}
+          SukiSU extension ABI: ${SUKISU_EXTENSION_API:-unknown}
+          SukiSU version spoof: ${SUKISU_VERSION_SPOOF:-unknown}
+          SukiSU backport: ${SUKISU_BACKPORT:-custom-source}
           KPM final Image status: ${KPM_PATCH_STATUS:-unknown}
           KPM patch source: SukiSU-Ultra/SukiSU_patch @ ${SUKISU_KPM_PATCH_REF}
           SUSFS: cctv18/susfs4oki only, ref=${{ inputs.susfs_ref }}
@@ -2058,6 +2079,9 @@ jobs:
             echo "SukiSU driver version input: ${{ inputs.sukisu_driver_version }}"
             echo "SukiSU version mode: ${{ steps.sukisu_version.outputs.mode }}"
             echo "SukiSU driver version: ${SUKISU_DRIVER_VERSION:-unknown}"
+            echo "SukiSU extension ABI: ${SUKISU_EXTENSION_API:-unknown}"
+            echo "SukiSU version spoof: ${SUKISU_VERSION_SPOOF:-unknown}"
+            echo "SukiSU backport: ${SUKISU_BACKPORT:-custom-source}"
             echo "SUSFS enabled: ${{ inputs.SUSFS }}"
             echo "SUSFS ref: ${{ inputs.susfs_ref }}"
             echo "SUSFS patch policy: ${{ inputs.susfs_patch_policy }}"

@@ -44,6 +44,7 @@ class DropdownTests(unittest.TestCase):
     def test_latest_choice_and_compatibility_values(self):
         updated = sync.update_choices(self.source, "41050")
         self.assertIn('          - "41050"', updated)
+        self.assertIn('          - "41140"', updated)
         self.assertIn('          - "40994"', updated)
         self.assertIn('          - "40900"', updated)
         self.assertIn('          - "40796"', updated)

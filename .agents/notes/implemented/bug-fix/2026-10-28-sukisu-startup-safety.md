@@ -64,6 +64,9 @@ The two new optional hiding/startup behaviors are absent in the patched pin.
 SUSFS, KPM, HybridSwap and the firmware I/O default retain their prior
 configuration. Old v114-17 archives do not acquire this fix retroactively.
 
+The [v4.3 extension backport](../feature/2026-11-08-sukisu-v430-extensions.md)
+keeps these startup exclusions while adding the new Manager-facing handlers.
+
 Patch applicability and source inclusion/registration paths receive static review only,
 per the current source-push scope. No build, test suite, phone modification or
 reboot is performed. Runtime confirmation still needs a new build and the

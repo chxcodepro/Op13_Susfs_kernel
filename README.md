@@ -1,7 +1,7 @@
 <!--
   Op13_Susfs_kernel — README
   Repo: ox1d3x3/Op13_Susfs_kernel
-  README revision: 2026-10-27 (SukiSU Ultra v114 + fork UAPI 5 repair · BakaSU v111)
+  README revision: 2026-11-08 (SukiSU v4.3 extensions backport · BakaSU v111)
 -->
 
 <h1 align="center">If This Kernel is useful to you, a ⭐ helps others find it.</h1>
@@ -57,12 +57,13 @@ CCTV18 OP13 source, toolchain and SUSFS tree:
 | Lane | Workflow | Root solution | Manager APK | Pick it if… |
 |---|---|---|---|---|
 | **BakaSU** (Recommended) | `Build_ReSukiSU.yml` | [BakaSU](https://github.com/Baka-SU/BakaSU) (formerly ReSukiSU) | latest BakaSU manager | you want the daily driver — the most tested lane |
-| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) (`builtin`, native UAPI 6) | v4.2.1-r2 / 41068, or a checked compatible stable release | you want SukiSU Ultra with KPM support |
+| **SukiSU Ultra** | `Build SukiSU_Ultra.yml` | [SukiSU‑Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) (`builtin`, UAPI 6 + extension ABI 2 backport) | v4.3.0-r2 / 41150, or a checked compatible stable release | you want SukiSU Ultra with KPM support |
 
 > [!IMPORTANT]
-> **SukiSU Manager pairing:** new builds default to native UAPI 6, targeting
-> v4.2.1-r2 / 41068. Both `auto` and numeric version choices check the actual
-> Manager interface before building. Existing release assets retain the pair
+> **SukiSU Manager pairing:** new builds default to native UAPI 6 with v4.3
+> version customization and extension ABI 2, targeting v4.3.0-r2 / 41150.
+> Both `auto` and numeric version choices check the actual Manager UAPI and
+> extension requirements before building. Existing release assets retain the pair
 > recorded in their own build summary; this source update requires a new build.
 > The earlier UAPI 5 pair remains selectable with driver `0af2cf9` and Manager
 > v4.2.1 / 40994.
@@ -106,7 +107,7 @@ several times.
 | SUSFS — BakaSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) |
 | SUSFS — SukiSU lane | `cctv18/susfs4oki` (`oki-android15-6.6`) | `3f6aae5` (v2.3.0) + driver static-key ABI patch |
 | BakaSU driver | `Baka-SU/BakaSU` `main` | `d7260ca` |
-| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `ce75122` (native UAPI 6) + ABI/startup-safety repair |
+| SukiSU driver | `SukiSU-Ultra/SukiSU-Ultra` `builtin` | `ce75122` + startup/CCTV18 repair + v4.3 extensions and applicable r1 fixes |
 | Build assets | `cctv18/oppo_oplus_realme_sm8750` | `21db9e7` |
 | Packaging | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `020dfec` |
 | Toolchain | CCTV18 prebuilt LLVM/Clang 18 (`r510928`) | release tag |
@@ -125,7 +126,7 @@ several times.
 |---|---|---|
 | `profile` | `stock_daily` / `stock_plus` / `minimal_safe` / `debug_only` | `stock_daily` |
 | `sukisu_ref` / `resukisu_ref` | Root driver commit (keep paired with `susfs_ref`) | pinned commit |
-| `sukisu_driver_version` | Latest official stable Manager or numeric versionCode; both check its UAPI | `auto` (resolved at build time) |
+| `sukisu_driver_version` | Latest official stable Manager or numeric versionCode; both check UAPI and extensions | `auto` (resolved at build time) |
 | `susfs_ref` | SUSFS commit | pinned commit |
 | `SUSFS` | Enable CCTV18 SUSFS | On |
 | `susfs_patch_policy` | `audited_cctv18` / `strict` / `native_cctv18` | `audited_cctv18` |
@@ -148,7 +149,7 @@ several times.
 
 **Sync SukiSU versions** refreshes the dropdown daily at 10:23 Asia/Shanghai
 (GitHub scheduling may be delayed), or when run manually. It keeps `auto`, the
-latest official stable versionCode, `40994`, `40900`, and `40796`. A changed release
+latest official stable versionCode, `41140` (v4.3.0-r1), `40994`, `40900`, and `40796`. A changed release
 creates one commit on the default branch; unchanged releases create none.
 
 Set the repository Actions secret `SUKISU_VERSION_SYNC_TOKEN` to a fine-grained
@@ -158,27 +159,22 @@ files ([permission requirements](https://docs.github.com/en/rest/repos/contents#
 Branch protection must permit the token's owner to push; a rejected push
 fails the sync rather than bypassing protection.
 
-The build summary shows the resolved driver version, selected source commit,
-and driver/Manager UAPI before compilation. `auto` reads the official release's
-UAPI header and rejects mismatches before overriding the numeric driver
-version. Explicit numeric selections remain available for legacy pairs and are
-marked `manual-unchecked`; they do not validate Manager compatibility.
+The build summary records the resolved driver version, source commit, UAPI,
+extension ABI and version-spoof support. Both `auto` and numeric selections
+read the official Manager's headers; numeric selections record `manual-checked`.
+Only the explicit pre-UAPI `6c13a06` / 40796 lane uses `manual-unchecked`.
 
-For this release, select `40994` and install SukiSU Manager **v4.2.1** (UAPI 5).
-The latest v4.2.1-r2 / 41068 uses UAPI 6; `auto` rejects that newer interface
-against the current UAPI 5 driver. `40994` stays in the compatibility choices
-after scheduled refreshes.
+Keep the default `ce75122` / `3f6aae5` pair and select `auto` or `41150` for
+Manager **v4.3.0-r2**. The builtin patch adds version-spoof GET/SET/RESET,
+version response hooks, extension capabilities and ABI 2 enumeration. The
+existing startup exclusions, static-key repair, KPM pipeline and SELinux
+policy-query guard remain in place. A final linked-symbol check verifies the
+version-spoof IO handler before packaging.
 
-The SukiSU default pairs builtin `0af2cf9` with CCTV18 SUSFS `3f6aae5` (v2.3.0).
-The repository's pinned-source patch completes UAPI 5 reporting and bundled-LKM
-flags, and repairs the missing manager ioctl declaration and package-scan build
-error. It also aligns the su-compat switch with SUSFS's static-key ABI; the
-build checks that the linked symbol is not a one-byte bool. Scoped su-session
-descriptors and services start/skip handling are
-already present in that builtin source. Selecting a version does not upgrade
-SukiSU or SUSFS source refs and does not establish firmware compatibility.
-See the [Manager compatibility decision](.agents/notes/implemented/bug-fix/2026-10-17-sukisu-uapi-manager-compatibility.md)
-for the source audit and successful repair build.
+The legacy `0af2cf9` / `3f6aae5` / `40994` pair remains available for Manager
+v4.2.1. A version choice updates the reported numeric version; source refs and
+backports are selected separately. See the [v4.3 adaptation report](docs/SUKISU_v4.3_ADAPTATION.md)
+for the latest two release summaries, patch provenance, use and recovery.
 
 > **Feature inputs:** ADIOS and Re:Kernel use the existing kernel sources;
 > Baseband‑Guard installs its pinned LSM source. FengChi/HMBIRD and extra
@@ -200,6 +196,8 @@ Each run uploads one artifact containing:
   - `pairing.txt` — must say `pairing: OK`
   - `susfs-config-audit.txt` — every requested SUSFS option is `=y`
   - `cve-status.txt`, `sec-posix-timers.txt` — security fixes applied
+  - `sukisu-uapi-compat.json` — driver/Manager UAPI and extension requirements
+  - `sukisu-version-spoof-symbol.txt` — linked version-spoof IO handler
 
 ---
 
@@ -220,6 +218,8 @@ Each run uploads one artifact containing:
   6.6‑stable posix‑cpu‑timers use‑after‑free fix
 - **KPM** support on the SukiSU lane, including final-Image KernelPatch injection
   and standalone/AnyKernel3 Image consistency checks; no modules bundled
+- **SukiSU version customization** and kernel-driven extension discovery
+  through the v4.3 builtin backport
 
 **Companion module:** **X1 Kernel Manager** (`ox_op13_kernel_manager`) — WebUI
 for profiles, ZRAM, charging and live stats, plus the SUSFS privacy layer (path /
@@ -295,6 +295,11 @@ su -c 'dmesg | grep -E "scanning manager|Crowning manager"'
   The explicit pre-UAPI `6c13a06` / 40796 lane retains its legacy path.
 - **SukiSU: "Failed to grant Root!" until the manager is restarted** — fixed in
   v114 (early manager scan at post‑fs‑data). Update the kernel.
+- **SukiSU version customization unavailable** — use a fresh default-pair build
+  containing `sukisu-builtin-v4.3-extensions.patch` and the matching Manager.
+  Its build report should show extension ABI 2 and `version_spoof: true`.
+  Keep UAPI 6 and the matching Manager's versionCode when customizing the full
+  version string; recovery instructions are in the adaptation report.
 - **SUSFS module "operation not supported" / `0x555e1`** — reinstall the SUSFS
   module after flashing; if you had a different one before, uninstall it, reboot,
   then install the correct one.

@@ -5,6 +5,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -78,6 +79,36 @@ def manager_uapi(tag):
     return parse_uapi_version(source)
 
 
+def extension_contract(source):
+    source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
+    versions = re.findall(
+        r"(?m)^\s*#define\s+KSU_EXTENSION_API_VERSION\s+([0-9]+)[uU]?\s*$", source
+    )
+    if "KSU_EXTENSION_API_VERSION" in source and (len(versions) != 1 or int(versions[0]) <= 0):
+        raise ValueError("Expected one positive KSU_EXTENSION_API_VERSION definition")
+    return {
+        "api": int(versions[0]) if versions else 0,
+        "version_spoof": bool(re.search(r"\bKSU_EXTENSION_VERSION_SPOOF\s*=\s*5\b", source)),
+    }
+
+
+def manager_extensions(tag):
+    try:
+        payload = github_json("contents/uapi/extension.h?ref=" + quote(tag, safe=""))
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+        return extension_contract("")
+    return extension_contract(base64.b64decode(payload["content"]).decode("utf-8-sig"))
+
+
+def driver_extensions(kernel_dir):
+    for header in (kernel_dir / "include/uapi/extension.h", kernel_dir.parent / "uapi/extension.h"):
+        if header.is_file():
+            return extension_contract(header.read_text(encoding="utf-8-sig"))
+    return extension_contract("")
+
+
 def verify(kernel_dir, tag="", manager_version=""):
     if tag and manager_version:
         raise ValueError("Choose either a Manager tag or versionCode")
@@ -90,11 +121,21 @@ def verify(kernel_dir, tag="", manager_version=""):
             f"SukiSU UAPI mismatch: driver={actual}, Manager {tag}={expected}. "
             "Select a compatible driver/SUSFS pair; changing KSU_VERSION is not an interface upgrade."
         )
+    extensions = driver_extensions(kernel_dir) if tag else {"api": None, "version_spoof": False}
+    required = manager_extensions(tag) if tag else None
+    if required and required["version_spoof"] and not extensions["version_spoof"]:
+        raise ValueError(
+            f"SukiSU extension mismatch: driver={extensions}, Manager {tag}={required}. "
+            "Apply the v4.3 extension backport or select a compatible source/Manager pair."
+        )
     return {
         "kernel_uapi": actual,
         "manager_uapi": expected,
         "manager_tag": tag,
         "manager_version": manager_version or None,
+        "kernel_extension_api": extensions["api"],
+        "manager_extension_api": required["api"] if required else None,
+        "kernel_version_spoof": extensions["version_spoof"],
         "mode": "manual-checked" if manager_version else "auto" if tag else "manual-unchecked",
     }
 
@@ -109,7 +150,7 @@ def main():
     try:
         result = verify(args.kernel_dir.resolve(), args.manager_tag, args.manager_version)
     except (OSError, ValueError, KeyError) as error:
-        print(f"UAPI compatibility check failed: {error}", file=sys.stderr)
+        print(f"SukiSU compatibility check failed: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result))
     return 0

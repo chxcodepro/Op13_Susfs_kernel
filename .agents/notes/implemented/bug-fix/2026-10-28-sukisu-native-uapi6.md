@@ -37,6 +37,9 @@ The [UAPI 5 repair](2026-10-17-sukisu-uapi-manager-compatibility.md) remains
 responsible for the legacy 0af2cf9 selection and its SELinux helpers. This
 decision owns the new default and the workflow's checked numeric selections.
 
+The [v4.3 extension backport](../feature/2026-11-08-sukisu-v430-extensions.md)
+adds version customization and extension ABI checks to this same guarded pin.
+
 ## Alternatives considered
 
 - Change the old header number to 6: small diff, but omits symbol lookup and
