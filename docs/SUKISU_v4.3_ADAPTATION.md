@@ -96,8 +96,13 @@ stop before compilation because the public Clang asset URL returns HTTP 504.
 The toolchain-download repair resolves both archive IDs from the same release
 tag and uses the official asset API with bounded curl retries. Its
 [decision record](../.agents/notes/implemented/bug-fix/2026-11-08-sukisu-toolchain-asset-api.md)
-preserves the evidence and download contract. The API serves a checked one-byte
-Clang range; complete archive transfer remains unverified.
+preserves the evidence and download contract. The user-started
+[run 42472248698](https://github.com/chxcodepro/Op13_Susfs_kernel/actions/runs/42472248698)
+passes full toolchain transfer/extraction, kernel compilation, packaging and
+artifact upload. Its compatibility report records UAPI 6/6, extension ABI 2/2
+and `kernel_version_spoof=true` for Manager v4.3.0-r2 (41150). The artifact
+**OP13-SUKISU-CCTV18-INLINE-STOCKLIKE-v114-22** is available from that run.
+The separate actionlint download failure uses the same asset-API repair.
 
 The backport is assembled from the upstream builtin patches against the exact
 repaired pin, with a small adaptation of the r1 SELinux-generation fix to retain
@@ -106,7 +111,8 @@ dispatch callers, payload layouts, source inclusion, failure paths and workflow
 ordering. Added regression fixtures cover equal-UAPI/missing-extension rejection,
 ABI parsing, release-layout headers, legacy calls and HTTP failures.
 
-Per the requested scope, verification is static review only. No test suite,
-kernel build or device flash is performed. Compilation,
-boot stability, save/reset and reboot persistence still need confirmation on a
-newly built candidate. Keep a usable boot-image backup for that device stage.
+Local verification follows the requested static-review-only scope; no local
+test suite or kernel build is started. The user-started GitHub build above
+passes compilation and packaging. Device boot stability, save/reset and reboot
+persistence still need confirmation with v114-22. Keep a usable boot-image
+backup before that device stage.
